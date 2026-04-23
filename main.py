@@ -14,10 +14,11 @@ load_dotenv()
 MONGO_CONNECTION_STRING = os.getenv("MONGO_URI")
 
 db = None
+client = None
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global db
+    global db, client
     # Connect to MongoDB cluster
     client = AsyncIOMotorClient(MONGO_CONNECTION_STRING)
     db = client["personal-media-database"]
@@ -42,15 +43,36 @@ app.add_middleware(
 
 @app.post("/activity/", response_model=ActivityEvent)
 async def log_activity(event: ActivityEvent):
-    # TODO: will put the transaction logic here soon!
+    # TODO: If there are no IN-PROGRESS watch_history elements, we should make a new one, and update the media's status.
+    # TODO: Also, if we just reached the end of the media, update the status and change the repeats count if necessary.
     event_dict = event.model_dump()
-    event_dict["timestamp"] = datetime.datetime.utcnow()
+    event_dict["timestamp"] = datetime.datetime.now(datetime.UTC)
+    if "progress_added" not in event_dict.keys():
+        event_dict["progress_added"] = 0
     
-    # Just a basic insert for now
-    new_event = await db.activity_log.insert_one(event_dict)
+    async with await client.start_session() as session:
+        async with session.start_transaction():
+            media_update = await db.media.update_one(
+                {"_id": ObjectId(event_dict["media_id"])}, 
+                {"$inc": {
+                    "progress": event_dict["progress_added"], # Total progress
+                    "watch_history.$[elem].progress": event_dict["progress_added"] # Array item progress
+                }},
+                array_filters=[{"elem.status": "IN-PROGRESS"}],
+                session=session
+            )
+            activity_log_insertion = await db.activity_log.insert_one({
+                "media_id": ObjectId(event_dict["media_id"]),
+                "media_type": event_dict["media_type"],
+                "action_type": event_dict["action_type"],
+                "progress_added": event_dict["progress_added"],
+                "timestamp": event_dict["timestamp"]
+            }, session=session)
     
-    if new_event.inserted_id:
-        return event
+    if activity_log_insertion.inserted_id:
+        if media_update.modified_count > 0:
+            return event
+        raise HTTPException(status_code=500, detail="Failed to update media file")
     raise HTTPException(status_code=500, detail="Failed to log activity")
 
 

@@ -82,7 +82,7 @@
     <!-- <h1>My Media Library</h1> --> <!-- I did kinda like having this be separate from the bar, but having be on the bar makes sense for now until the bar maybe fills up more.-->
     <div class="sticky-header">
         <h1>Media Library</h1>
-        <h2></h2> <!--Add the total number of entries-->
+        <h3></h3>
         <label for="sort-order">Sort By:</label>
         <select id="sort-order" onchange="renderMedia()">
             <option value="name">Name</option>
@@ -130,9 +130,20 @@
                 });
                 
                 renderMedia();
+
+                document.querySelector(".sticky-header h3").textContent = `Total Entries: ${rawMedia.length}`;
             } catch (error) {
                 console.error("Error fetching data:", error);
                 document.getElementById('media-container').innerHTML = "<p>Error loading database. Is the server running?</p>";
+            }
+        }
+
+        function getProgress(item) {
+            if (item.watch_history.length != 0) {
+                return item.watch_history[item.watch_history.length - 1].progress;
+            } else {
+                // alert(`${item.title} has no watch history. Is that ok?`);
+                return 0;
             }
         }
 
@@ -177,7 +188,8 @@
                 items.forEach(item => {
                     // Calculate display score (from your 1000-point database scale)
                     const displayScore = item.score ? (item.score / 100).toFixed(1) : "N/A";
-                    const current = item.progress || 0;
+                    progress = getProgress(item);
+                    const current = progress || 0;
 
                     let percent = 0;
                     if (item.total_units && item.total_units > 0) {
@@ -193,12 +205,13 @@
                         <div class="status status-${item.status}">${item.status}</div>
                         <div><strong>Type:</strong> ${item.media_type}</div>
                         <div><strong>Score:</strong> ${displayScore} / 10</div>
-                        <div class="progress-container">
-                            <div class="progress-bar" style="width: ${percent}%"></div>
+                        <label for="progress-container-${item._id}" id="progress-${item._id}"><strong>Progress:</strong> ${progress} / ${item.total_units}</label>
+                        <div class="progress-container" id="progress-container-${item._id}"">
+                            <div class="progress-bar" style="width: ${percent}%" id="progress-bar-${item._id}"></div>
                         </div>
-                        <div><strong>Episodes/Vols:</strong> ${item.total_units || '?'}</div>
                         <button class="btn" onclick="logWatch('${item._id}', '${item.media_type}')">+1 Progress</button>
                     `;
+                    // <div><strong>Episodes/Chapters:</strong> ${item.total_units || '?'}</div>
                     grid.appendChild(card);
                 });
                 container.appendChild(dropdown);
@@ -207,7 +220,33 @@
 
         // A placeholder for our next step!
         function logWatch(mediaId, mediaType) {
-            alert(`Ready to build the POST request for ${mediaType} ID: ${mediaId}`);
+            fetch('http://127.0.0.1:8000/activity/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    media_id: mediaId,
+                    media_type: mediaType,
+                    action_type: "PROGRESS_UPDATE",
+                    progress_added: 1   // TODO: If the front end is ever changed to be able to do more than one at a time, change this to handle it.
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                item = Object.values(mediaLists).flat().find(item => item._id === mediaId)
+                progress = getProgress(item);
+                let percent = 0;
+                if (item.total_units && item.total_units > 0) {
+                    percent = (current / item.total_units) * 100;
+                }
+                if (percent > 100) percent = 100;
+                document.querySelectorAll(`progress-${mediaId}`).textContent = `<strong>Progress:</strong> ${progress} / ${item.total_units}`;
+                const progressBar = document.getElementById(`progress-bar-${mediaId}`);
+                progressBar.style.width = `${percent}%`;
+            })
+            .catch(error => console.error('Error:', error));
+            // alert(`Ready to build the POST request for ${mediaType} ID: ${mediaId}`);
         }
 
         // Run the fetch when the page loads
