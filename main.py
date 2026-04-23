@@ -1,6 +1,6 @@
 from fastapi import FastAPI, HTTPException
 from motor.motor_asyncio import AsyncIOMotorClient
-from models import ActivityEvent
+from models import ActivityEvent, MediaItem
 import datetime
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi import HTTPException, Query
@@ -41,7 +41,7 @@ app.add_middleware(
 )
 
 
-@app.post("/activity/", response_model=ActivityEvent)
+@app.post("/activity/", response_model=MediaItem)
 async def log_activity(event: ActivityEvent):
     # TODO: If there are no IN-PROGRESS watch_history elements, we should make a new one, and update the media's status.
     # TODO: Also, if we just reached the end of the media, update the status and change the repeats count if necessary.
@@ -71,7 +71,10 @@ async def log_activity(event: ActivityEvent):
     
     if activity_log_insertion.inserted_id:
         if media_update.modified_count > 0:
-            return event
+            item = await db.media.find_one({"_id": ObjectId(event_dict["media_id"])})
+            if item:
+                item["_id"] = str(item["_id"]) # Convert ObjectId to string
+            return item
         raise HTTPException(status_code=500, detail="Failed to update media file")
     raise HTTPException(status_code=500, detail="Failed to log activity")
 

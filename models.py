@@ -17,3 +17,18 @@ class ActivityEvent(BaseModel):
                 "progress_added": 2
             }
         }
+
+class WatchAttempt(BaseModel):
+    progress: int
+    status: str
+    watch_notes: Optional[str] = None
+
+class MediaItem(BaseModel):
+    media_id: str = Field(alias="_id")
+    media_type: str
+    score: int
+    status: str
+    title: str
+    total_units: Optional[int]  # Has to be optional for now, because we don't have this data in the database yet.
+    lists: List[str]
+    watch_history: List[WatchAttempt]

@@ -79,11 +79,11 @@
 </head>
 <body>
 
-    <!-- <h1>My Media Library</h1> --> <!-- I did kinda like having this be separate from the bar, but having be on the bar makes sense for now until the bar maybe fills up more.-->
+    <!-- <h1>My Media Library</h1> --> <!-- I did kinda like having this be separate from the bar, but having be on the bar makes sense for now until the bar maybe fills up more. Or maybe have it be above the bar when we're scrolled to the top of the page, but fall down into the bar when you scroll down?-->
     <div class="sticky-header">
         <h1>Media Library</h1>
         <h3></h3>
-        <label for="sort-order">Sort By:</label>
+        <label for="sort-order" style="padding-left: 10px;">Sort By:</label>
         <select id="sort-order" onchange="renderMedia()">
             <option value="name">Name</option>
             <option value="score">Score</option>
@@ -96,7 +96,6 @@
     </div>
 
     <script>
-        // Your FastAPI backend URL
         const API_URL = "http://127.0.0.1:8000";
         let mediaLists = {}
         async function fetchMedia() {
@@ -186,14 +185,13 @@
 
 
                 items.forEach(item => {
-                    // Calculate display score (from your 1000-point database scale)
+                    // Calculate display score
                     const displayScore = item.score ? (item.score / 100).toFixed(1) : "N/A";
                     progress = getProgress(item);
-                    const current = progress || 0;
 
                     let percent = 0;
                     if (item.total_units && item.total_units > 0) {
-                        percent = (current / item.total_units) * 100;
+                        percent = (progress / item.total_units) * 100;
                     }
                     if (percent > 100) percent = 100;
 
@@ -211,42 +209,53 @@
                         </div>
                         <button class="btn" onclick="logWatch('${item._id}', '${item.media_type}')">+1 Progress</button>
                     `;
-                    // <div><strong>Episodes/Chapters:</strong> ${item.total_units || '?'}</div>
                     grid.appendChild(card);
                 });
                 container.appendChild(dropdown);
             });
         }
 
-        // A placeholder for our next step!
-        function logWatch(mediaId, mediaType) {
-            fetch('http://127.0.0.1:8000/activity/', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    media_id: mediaId,
-                    media_type: mediaType,
-                    action_type: "PROGRESS_UPDATE",
-                    progress_added: 1   // TODO: If the front end is ever changed to be able to do more than one at a time, change this to handle it.
-                })
-            })
-            .then(response => response.json())
-            .then(data => {
-                item = Object.values(mediaLists).flat().find(item => item._id === mediaId)
-                progress = getProgress(item);
-                let percent = 0;
-                if (item.total_units && item.total_units > 0) {
-                    percent = (current / item.total_units) * 100;
+        async function logWatch(mediaId, mediaType) {
+            try {
+                const response = await fetch(`${API_URL}/activity/`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        media_id: mediaId,
+                        media_type: mediaType,
+                        action_type: "PROGRESS_UPDATE",
+                        progress_added: 1
+                    })
+                });
+
+                if (!response.ok) {
+                    alert("Database update failed! Check server logs.");
+                    return;
                 }
+
+                const freshItem = await response.json();
+
+                Object.keys(mediaLists).forEach(list => {
+                    const index = mediaLists[list].findIndex(i => i._id === mediaId);
+                    if (index !== -1) mediaLists[list][index] = freshItem;
+                });
+
+                const newProgress = getProgress(freshItem);
+                const total = freshItem.total_units || '?';
+                let percent = (total !== '?') ? (newProgress / total) * 100 : 0;
                 if (percent > 100) percent = 100;
-                document.querySelectorAll(`progress-${mediaId}`).textContent = `<strong>Progress:</strong> ${progress} / ${item.total_units}`;
-                const progressBar = document.getElementById(`progress-bar-${mediaId}`);
-                progressBar.style.width = `${percent}%`;
-            })
-            .catch(error => console.error('Error:', error));
-            // alert(`Ready to build the POST request for ${mediaType} ID: ${mediaId}`);
+
+                document.querySelectorAll(`#progress-${mediaId}`).forEach(el => {
+                    el.innerHTML = `<strong>Progress:</strong> ${newProgress} / ${total}`;
+                });
+
+                document.querySelectorAll(`#progress-bar-${mediaId}`).forEach(bar => {
+                    bar.style.width = `${percent}%`;
+                });
+
+            } catch (error) {
+                console.error('Network Error:', error);
+            }
         }
 
         // Run the fetch when the page loads
