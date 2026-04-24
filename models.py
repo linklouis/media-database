@@ -32,3 +32,9 @@ class MediaItem(BaseModel):
     total_units: Optional[int]  # Has to be optional for now, because we don't have this data in the database yet.
     lists: List[str]
     watch_history: List[WatchAttempt]
+
+class detailsUpdate(BaseModel):
+    media_id: str
+    new_progress: int
+    new_score: int
+    # TODO: Also need stuff like watch history and notes
