@@ -1,6 +1,6 @@
 from fastapi import FastAPI, HTTPException
 from motor.motor_asyncio import AsyncIOMotorClient
-from models import ActivityEvent, MediaItem
+from models import ActivityEvent, MediaItem, DetailsUpdate
 import datetime
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi import HTTPException, Query
@@ -115,6 +115,45 @@ async def get_media_by_id(media_id: str):
         return document
         
     raise HTTPException(status_code=404, detail="Media not found")
+
+@app.put("/media/{media_id}", response_model=MediaItem)
+async def update_media_details(media_id: str, update_data: DetailsUpdate):
+    
+    # 1. Prepare the fields to update
+    update_doc = {
+        "score": update_data.new_score,
+        "status": update_data.new_status,
+        "progress": update_data.new_progress,
+        # In a real app, you'd iterate through the watch_history and update each element,
+        # but for now, you can overwrite the whole array if the frontend sends the whole array back.
+        "watch_history": [attempt.model_dump() for attempt in update_data.watch_history]
+    }
+
+    async with await client.start_session() as session:
+        async with session.start_transaction():
+            
+            # 2. Update the media document
+            media_update = await db.media.update_one(
+                {"_id": ObjectId(media_id)}, 
+                {"$set": update_doc},
+                session=session
+            )
+            
+            # 3. Log the "Bulk Edit" action
+            await db.activity_log.insert_one({
+                "media_id": ObjectId(media_id),
+                "media_type": "UNKNOWN", # You might want to pass this in from the frontend too
+                "action_type": "BULK_EDIT",
+                "timestamp": datetime.datetime.now(datetime.UTC)
+            }, session=session)
+            
+    # 4. Fetch and return the fresh item
+    item = await db.media.find_one({"_id": ObjectId(media_id)})
+    if item:
+        item["_id"] = str(item["_id"])
+        return item
+        
+    raise HTTPException(status_code=404, detail="Media not found after update")
 
 
 if __name__ == "__main__":
