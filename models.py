@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional, List
 from datetime import datetime
 
@@ -33,8 +33,10 @@ class MediaItem(BaseModel):
     lists: List[str]
     watch_history: List[WatchAttempt]
 
-class detailsUpdate(BaseModel):
+class DetailsUpdate(BaseModel):
     media_id: str
     new_progress: int
     new_score: int
-    # TODO: Also need stuff like watch history and notes
+    watch_history: list # TODO: Right type?
+
+    model_config = ConfigDict(populate_by_name=True)

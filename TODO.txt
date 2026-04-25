@@ -1,0 +1,2 @@
+- Make master list for all cards on UI. Store the formatted status and media format in there too
+- Add an extra watch history for all cards in repeating

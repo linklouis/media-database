@@ -98,8 +98,7 @@
         /* Firefox */
         input[type=number] {
             -moz-appearance: textfield;
-            field-sizing: content; /* TODO: Can't get it to fit to its content */
-            min-inline-size: 5ch;
+            width: 6ch;
         }
 
         .btn {
@@ -197,6 +196,8 @@
             flex-direction: column;
             align-items: left;
             box-shadow: 0 4px 20px var(--shadow);
+            gap: 10px;
+            justify-content: space-between;
         }
 
         .details-container {
@@ -204,6 +205,8 @@
             flex-direction: row;
             align-items: center;
             gap: 15px;
+            /* flex: 0 0 805px; /* TODO: Trying to get the lists to wrap down and be below the main-details-container before the elements in the watch history cards start wrapping, but it's not working, and this being in here messes it up because it doesn't let the details window shrink vertically around the details when they're smaller. */
+            flex-wrap: wrap;
         }
 
         .main-details-container {
@@ -214,6 +217,10 @@
             padding: 15px;
             flex: 1;
             box-shadow: 0 2px 5px var(--shadow);
+            width: min-content;
+            flex-grow: 2;
+            gap: 10px;
+            justify-content: space-between;
         }
 
         .small-details-container {
@@ -224,19 +231,24 @@
         }
 
         .watch-history-container {
+            /* TODO: Should get a scroll bar once there's too many elements */
             display: flex;
             flex-direction: column;
             gap: 7px;
             border: 1px solid black;
             border-radius: 8px;
-            padding: 10px;
+            padding: 13px;
             flex: 1;
-            box-shadow: 0 2px 5px var(--shadow);
+            box-shadow: inset 0 0 5px var(--shadow);
         }
         .history-card {
-            border: 1px solid black;
+            display: flex;
+            flex-direction: column;
+            border: 2px solid black;
             border-radius: 8px;
-            padding: 7px;
+            padding: 10px;
+            /* width: max-content; */
+            gap: 8px;
         }
 
         .lists-section-container {
@@ -244,9 +256,12 @@
             flex-direction: column;
             border: 1px solid black;
             border-radius: 8px;
-            padding: 3px;
+            padding: 15px;
             flex: 1;
             box-shadow: 0 2px 5px var(--shadow);
+            width: max-content; /* TODO: Not sure if this is the right call, but the list names should be short I think, and I don't want to have words wrap on themselves? */
+            min-width: fit-content;
+            flex-grow: 1;
         }
 
         .lists-details-container {
@@ -260,7 +275,16 @@
             box-shadow: 0 2px 5px var(--shadow);
         }
 
-        .notes-container {
+        /* .notes-container {
+            border: 1px solid black;
+            border-radius: 8px;
+            padding: 10px;
+            flex: 1;
+            box-shadow: inset 0 2px 5px var(--shadow);
+            white-space: pre-wrap;
+        } */
+
+        div[contenteditable="true"] {
             border: 1px solid black;
             border-radius: 8px;
             padding: 10px;
@@ -274,6 +298,12 @@
             flex-direction: column;
             padding: 10px;
             width: fit-content;
+        }
+
+        .details-section-heading {
+            margin-top: 0;
+            padding-left: 5px;
+            margin-bottom: 1px;
         }
     </style>
 </head>
@@ -298,8 +328,10 @@
 
     <div id="details-modal" class="modal">
         <div class="modal-content">
-            <h1 style="margin-bottom: 0; text-shadow: 3px 3px 5px var(--shadow);"></h1>
-            <hr style="width:100%; margin-bottom: 50;"> <!-- Margin isn't doing anything -->
+            <div>
+                <h1 style="margin-bottom: 0; text-shadow: 3px 3px 5px var(--shadow);"></h1>
+                <hr style="width:100%;">
+            </div>
             <div class="details-container">
                 <div class="main-details-container">
                     <div class="small-details-container">
@@ -319,48 +351,98 @@
                         </div>
                     </div>
 
-                    <h3 style="padding-left: 5px; margin-bottom: 1px;">Notes</h3>
-                    <!-- The notes text isn't formatted :( -->
-                    <div class="notes-container" id="notes-container" contenteditable="true"></div>
+                    <div>
+                        <h3 class="details-section-heading">Notes</h3>
+                        <!-- The notes text isn't formatted :( -->
+                        <div id="notes-container" contenteditable="true"></div>
+                    </div>
 
-                    <h2 style="padding-left: 3px; margin-bottom: 1;">Watch History</h2>
-                    <div class="watch-history-container", id="watch-history-container">
-                        <!-- TODO: Show each watch history element from newest to oldest.
-                        If there are none, have a button to make one. Doing this should change the status to watching. -->
+                    <div>
+                        <h2 class="details-section-heading" id="history-section-title">History</h2>
+                        <div class="watch-history-container", id="watch-history-container"></div>
                     </div>
                 </div>
 
                 <div class="lists-section-container">
-                    <h3 style="margin-top: 1; margin-left: 1;">Lists</h3> <!-- If I set margin-top to 0, it's too close, but if it's anything else it's a huge gap. Changing margin-left doesn't seem to do anything. Also h2 is too big but h3 is too small. -->
+                    <h3 class="details-section-heading">Lists</h3> <!-- h2 is too big but h3 is too small. -->
                     <div class="lists-details-container">
                         <!-- TODO: Show lists with check boxes, probably in order that they were created? -->
                     </div style="margin-bottom: 0;">
                 </div>
             </div>
-            <span class="btn" onclick="closeDetails()" style="align-self: right; text-align: center; width: fit-content;"><strong>Save</strong></span> <!-- TODO: Should be bottom right -->
+            <span class="btn" onclick="closeDetails(true)" style="align-self: right; text-align: center; width: fit-content;"><strong>Save</strong></span> <!-- TODO: Should be bottom right -->
         </div>
     </div>
 
     <script>
         const API_URL = "http://127.0.0.1:8000";
+        const allMedia = {};
         let mediaLists = {};
         const modal = document.getElementById("details-modal");
 
         window.onclick = function(event) {
-            // TODO: Hitting esc while the modal is open should also close it
-            if (event.target == modal) {
-                modal.style.display = "none";
-            }
+            if (event.target == modal) closeDetails(false);
         } 
 
-        function closeDetails() {
+        window.addEventListener('keydown', (e) => {
+            if (e.key === "Escape" && modal.style.display === "block") closeDetails(false);
+        });
+
+        function closeDetails(save) {
+            if (save) {
+                alert('Saving');
+            } else {
+                alert('Not saving');
+            }
             modal.style.display = "none";
             document.body.classList.remove("no-scroll");
+            renderMedia();
+        }
+
+        function getMediaFormat(mediaType) {
+            if (["Anime", "Anime Movie", "AMV", "Live-Action Movie", "Live-Action Show"].includes(mediaType)) {
+                return "watch";
+            } else if (["Manga", "Light Novel", "Webtoon", "Book"].includes(mediaType)) {
+                return "read";
+            }
+        }
+
+        function formatDate(dateString) {
+            if (dateString) {
+                return new Date(dateString).toISOString().split('T')[0];
+            } else {
+                return new Date().toISOString().split('T')[0];
+            }
+        }
+
+        function getFormattedStatus(item, mediaFormat) {
+            var itemStatus = item.status;
+            if (mediaFormat == "watch") {
+                switch (item.status) {
+                    case "CURRENT": { itemStatus = "WATCHING"; break; }
+                    case "REPEATING": { itemStatus = "RE-WATCHING"; break; }
+                }
+            } else if (mediaFormat == "read") {
+                switch (item.status) {
+                    case "CURRENT": { itemStatus = "READING"; break; }
+                    case "REPEATING": { itemStatus = "RE-READING"; break; }
+                }
+            } else {
+                itemStatus = "ERROR: MEDIA TYPE NOT RECOGNIZED";
+            }
+            return itemStatus;
+        }
+
+        function formatItem(rawItem) {
+            rawItem["media_format"] = getMediaFormat(rawItem.media_type);
+            rawItem["formatted_status"] = getFormattedStatus(rawItem, rawItem.media_format);    // TODO: Should maybe do this lazily?
+            rawItem.watch_history.forEach(history => {
+                history["formatted_status"] = getFormattedStatus(history, rawItem.media_format);
+            });
         }
 
         async function fetchMedia() {
             try {
-                // Call the GET route
                 const response = await fetch(`${API_URL}/media/`);
                 if (!response.ok) throw new Error("Network response was not ok");
                 
@@ -375,16 +457,19 @@
                 };
 
                 rawMedia.forEach(item => {
+                    allMedia[item._id] = item;
+                    formatItem(item);
+                    
                     if (!(item.status in mediaLists)) {
                         mediaLists[item.status] = [];
                     }
-                    mediaLists[item.status].push(item)
+                    mediaLists[item.status].push(item._id)
 
                     for (const list of item.lists) {
                         if (!(list in mediaLists)) {
                             mediaLists[list] = [];
                         }
-                        mediaLists[list].push(item);
+                        mediaLists[list].push(item._id);
                     }
                 });
                 
@@ -410,12 +495,12 @@
             const container = document.getElementById('media-container');
             container.innerHTML = ""; // Clear the loading text
             
-            Object.entries(mediaLists).forEach(([listName, items]) => {
+            Object.entries(mediaLists).forEach(([listName, ids]) => {
                 const dropdown = document.createElement('details');
                 dropdown.setAttribute('open', '');
 
                 const summary = document.createElement('summary');
-                summary.textContent = `${listName} (${items.length})`; // TODO: Make the number of elements be on the far right side?
+                summary.textContent = `${listName} (${ids.length})`; // TODO: Make the number of elements be on the far right side?
                 dropdown.appendChild(summary);
 
                 const grid = document.createElement('div');
@@ -425,17 +510,17 @@
                 const sorting = document.getElementById('sort-order').value;
 
                 switch (sorting) {
-                    case "name": {items.sort((a, b) => a.title.localeCompare(b.title)); break;}
-                    case "score": {items.sort((a, b) => (b.score || 0) - (a.score || 0)); break;}
-                    case "repeats": {items.sort((a, b) => (b.repeats || 0) - (a.repeats || 0)); break;}
+                    case "name": {ids.sort((a, b) => allMedia[a].title.localeCompare(allMedia[b].title)); break;}
+                    case "score": {items.sort((a, b) => (allMedia[b].score || 0) - (allMedia[a].score || 0)); break;}
+                    case "repeats": {items.sort((a, b) => (allMedia[b].repeats || 0) - (allMedia[a].repeats || 0)); break;}
                     case "watch_date": {
                         items.sort((a, b) => {
                             // Get the latest date from the history, or a very old date if empty
-                            const dateA = a.watch_history.length > 0 
-                                ? new Date(a.watch_history[a.watch_history.length - 1].start_date) 
+                            const dateA = allMedia[a].watch_history.length > 0 
+                                ? new Date(allMedia[a].watch_history[allMedia[a].watch_history.length - 1].start_date) 
                                 : new Date(0);
-                            const dateB = b.watch_history.length > 0 
-                                ? new Date(b.watch_history[b.watch_history.length - 1].start_date) 
+                            const dateB = allMedia[b].watch_history.length > 0 
+                                ? new Date(allMedia[b].watch_history[allMedia[b].watch_history.length - 1].start_date) 
                                 : new Date(0);
                             return dateB - dateA; // Descending (Newest first)
                         });
@@ -444,7 +529,8 @@
                 }
 
 
-                items.forEach(item => {
+                ids.forEach(id => {
+                    item = allMedia[id];
                     // Calculate display score
                     const displayScore = item.score ? (item.score / 100).toFixed(1) : "N/A";
                     var progress = getProgress(item);
@@ -455,34 +541,18 @@
                     }
                     if (percent > 100) percent = 100;
 
-                    var itemStatus = item.status;
-                    if (item.media_type  == "Anime" || item.media_type  == "Anime Movie"
-                        || item.media_type  == "Anime AMV" || item.media_type  == "Live-Action Movie"
-                        || item.media_type  == "Live-Action Show") {
-                        switch (item.status) {
-                            case "CURRENT": { itemStatus = "WATCHING"; break; }
-                            case "REPEATING": { itemStatus = "RE-WATCHING"; break; }
-                        }
-                    } else if (item.media_type  == "Manga" || item.media_type  == "Light Novel"
-                        || item.media_type  == "Webtoon" || item.media_type  == "Book") {
-                        switch (item.status) {
-                            case "CURRENT": { itemStatus = "READING"; break; }
-                            case "REPEATING": { itemStatus = "RE-READING"; break; }
-                        }
-                    }
-
                     // Create the card HTML
                     const card = document.createElement('div');
                     card.className = 'card';
                     card.innerHTML = `
                         <div class="title" onclick="openDetails('${item._id}')">${item.title}</div>
-                        <div class="status status-${item.status}">${itemStatus}</div>
+                        <div class="status status-${item.status}">${item.formatted_status}</div>
                         <div style="display: flex;  width: 100%; margin-bottom: 5px; margin-top: 0px;">
                             <div style="flex: 1;"><strong>${item.media_type}<strong></div>
                             <div">${displayScore} / 10</div>
                         </div>
-                        <div style="display: flex; width: 100%; margin-top: 5px; margin-bottom: -5px;">
-                            <label for="progress-container-${item._id}" id="progress-${item._id}">${progress} / ${item.total_units}</label> <!-- The text isn't aligned with the bar :( -->
+                        <div style="display: flex; width: 100%; margin-top: 5px; margin-bottom: -5px; align-items: center; gap: 3px;">
+                            <label for="progress-container-${item._id}" id="progress-${item._id}">${progress} / ${item.total_units}</label>
                             <div class="progress-container" id="progress-container-${item._id}">
                                 <div class="progress-bar" style="width: ${percent}%" id="progress-bar-${item._id}"></div>
                             </div>
@@ -559,57 +629,81 @@
         })();
 
         async function openDetails(mediaId) {
-            modal.style.display = "block";
-            document.body.classList.add("no-scroll");
-
             modal.querySelector('h1').textContent = "Loading media...";
 
             const response = await fetch(`${API_URL}/media/${mediaId}`);
             if (!response.ok) throw new Error("Network response was not ok");
             
             const item = await response.json();
-            Object.values(mediaLists).forEach(list => {
-                if (list.some(item => item._id == mediaId)) {
-                    index = list.findIndex(item => item._id == mediaId);
-                    list[index] = item;
-                }
-            });
+            if (mediaId != item._id) {
+                alert("SOMETHING HAS GONE TERRIBLY WRONG, WE GOT THE WRONG MEDIA IN OPEN DETAILS");
+            }
+            allMedia[mediaId] = item;
+            formatItem(item);
             // TODO: Need to actually update the rendering.
-            // TODO: Rather than having a bunch of copies of the same object, it probably makes more sense to have one dict that's just all of the shows by their ids, and then another dict that's arrays of ids by their categories. That way I could just update it in one spot, and then call for a UI update of one ID.
+            // TODO: (done?) Rather than having a bunch of copies of the same object, it probably makes more sense to have one dict that's just all of the shows by their ids, and then another dict that's arrays of ids by their categories. That way I could just update it in one spot, and then call for a UI update of one ID.
 
             modal.querySelector('h1').textContent = `${item.title}`;
             document.getElementById('status-detail').value = `${item.status}`;
             document.getElementById('score-detail').value = item.score/100;
-            document.getElementById('notes-container').textContent = `${item.watch_history.at(-1).watch_notes}`;
+            document.getElementById('notes-container').innerText = `${item.watch_history.at(-1).watch_notes}`;
 
             document.getElementById('watch-history-container').innerHTML = "";
             var count = item.watch_history.length;
+            const historyTitle = item.media_format.charAt(0).toUpperCase() + item.media_format.slice(1);
+            document.getElementById("history-section-title").textContent = historyTitle + " History"
+
             Object.values(item.watch_history).toReversed().forEach(history => {
                 const historyCard = document.createElement('div');
                 historyCard.className = 'history-card';
-                const end = history.end_date ? history.end_date : "Now";
-                // TODO: Format dates
+                
+                let start = "Unknown";
+                let end = "Unknown";
+                if (history.start_date) {
+                    start = formatDate(history.start_date);
+                    end = history.end_date ? formatDate(history.end_date) : formatDate();
+                } else if(history.status == "IN-PROGRESS") {
+                    end = history.end_date ? formatDate(history.end_date) : formatDate();
+                } else if (history.end_date) {
+                    end = formatDate(history.end_date);
+                }
+                
+                // TODO: The bottom border is too low
                 historyCard.innerHTML = `
-                    <div style="display: flex; flex-direction: row; flex: 1;">
-                        <div class="title" style="flex: 1;">Watch ${count}</div>
-                        <div>${history.status}</div>
+                    <div style="display: flex; flex-direction: row; justify-content: space-between; border-bottom: 1px solid grey; flex: 1; padding-bottom: 0px;">
+                        <div class="title">${historyTitle} ${count}</div>
+                        <div>${history.formatted_status}</div>
                     </div>
-                    <div style="display: flex; flex-direction: row; flex: 1;">
-                        <div style="flex: 1;">${history.start_date} - ${end}</div>
-                        <label for="progress-${mediaId}-${count}"><strong>Progress: </strong></label>
-                        <input type="number" id="progress-${mediaId}-${count}"></input>
+                    <div style="display: flex; flex-direction: row; justify-content: space-between; gap: 20px; max-width: 100%; flex: 1;">
+                        <div style="flex: 0 1 auto;">
+                            <input type="date" id="start-${mediaId}-${count}"></input>
+                             - 
+                            <input type="date" value="${end}"></input>
+                        </div>
+                        <div style="flex: 0 1 auto;">
+                            <label for="progress-${mediaId}-${count}"><strong>Progress: </strong></label>
+                            <input type="number" id="progress-${mediaId}-${count}"></input>
+                        </div>
                     </div>
-                    <label for="history-notes-${mediaId}-${count}"><strong>Notes: </strong></label>
-                    <div class="notes-container" id="history-notes-${mediaId}-${count}"></div>
+                    <div>
+                        <label for="history-notes-${mediaId}-${count}"><strong>Notes: </strong></label>
+                        <div id="history-notes-${mediaId}-${count}" contenteditable="true"></div>
+                    </div>
                 `;
                 document.getElementById('watch-history-container').appendChild(historyCard);
+                document.getElementById(`start-${mediaId}-${count}`).value = start;
                 document.getElementById(`progress-${mediaId}-${count}`).value = history.progress;
-                document.getElementById(`history-notes-${mediaId}-${count}`).textContent = history.watch_notes;
+                document.getElementById(`history-notes-${mediaId}-${count}`).innerText = history.watch_notes;
                 document.getElementById('watch-history-container').appendChild(historyCard);
                 count--;
             });
 
             // TODO: Populate lists
+            // Need to have some kind of a global list of all of the lists the user has defined.
+
+
+            modal.style.display = "block";
+            document.body.classList.add("no-scroll");
         }
 
 
