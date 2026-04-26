@@ -283,14 +283,11 @@
             overflow: hidden;
         }
 
-        .details-container { /* This shouldn't scroll */
+        .details-container {
             display: flex;
             flex-direction: row;
-            /* align-items: center; */
             gap: 15px;
-            /* flex-wrap: wrap; */ /* TODO: had to get rid of this so that the history would scroll, but now the lists card doesn't drop below the main-details card when the window gets too thin.*/
             flex: 1;
-            /*max-height: 80%; /* TODO: doesn't seem to be limiting it. Want to force children to scroll instead of this overflowing */
             min-height: 0;
         }
 
@@ -434,14 +431,14 @@
                 min-width: 0;           /* Release the 500px lock so it shrinks on thin screens */
                 width: 100%;
                 flex: 0 0 auto;
-                height: 60vh;           /* Re-establish a strict height so inner scrolling survives the stack */
+                /*height: 60vh;           /* Re-establish a strict height so inner scrolling survives the stack */
             }
 
             .lists-section-container {
                 min-width: 0;           /* Release the 400px lock */
                 width: 100%;
                 flex: 0 0 auto;
-                height: 40vh;           /* Give the lists card a defined height so it doesn't collapse */
+                /*height: 40vh;           /* Give the lists card a defined height so it doesn't collapse */
             }
         }
 
