@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Personal Media Database</title>
     <style>
+        * {
+            box-sizing: border-box;
+        }
         :root {
             --bg-color: #f4f4f9;
             --card-bg: white;
@@ -21,7 +24,7 @@
         /* 2. Define Dark Mode Overrides */
         .dark-mode {
             --bg-color: #121212;
-            --card-bg: #1e1e1e;
+            --card-bg: #292929;
             --text-color: #e0e0e0;
             --header-bg: #181818;
             --header-border: #333;
@@ -41,10 +44,10 @@
             color: var(--text-color);
             padding: 20px 2%;
         }
-        .grid { /* TODO: if there are few enough cards, this does only two columns. It should prioritize being wider over taller (As long as it fits in the defined size of the body). */
+        .grid { /* TODO: if there are few enough cards, this does only two columns. If there is enough room, it should always do the maximum number of columns before it does more rows. */
             display: grid;
-            grid-template-columns:
-            repeat(auto-fit, minmax(250px, 1fr));
+            /* grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); */
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
             gap: 20px;
         }
         .card { 
@@ -66,6 +69,7 @@
         }
         .card:hover {
             transform: translateY(-5px); /* Lift effect on hover */
+            box-shadow: 0 6px 20px var(--shadow);
         }
         .title {
             font-size: 1.2em;
@@ -134,6 +138,7 @@
             border-radius: 4px;
             cursor: pointer;
             box-shadow: 0 2px 10px var(--shadow);
+            text-align: center;
         }
         .btn:hover {
             background: #2e93ff;
@@ -180,14 +185,33 @@
             border-radius: 8px;
             box-shadow: 0 2px 5px var(--shadow);
             position: sticky;
-            top: 100px; /* Should rest just below the main header */
-            /* list-style: none; Removes the default arrow in some browsers */
+            top: 100px;
+            
+            /* Add Flexbox directly to the summary */
+            display: flex;
+            align-items: center;
+            list-style: none; /* Hides the default arrow in most browsers */
         }
-        summary::-webkit-details-marker { display: none; } /* Removes arrow in Safari/Chrome */
+        
+        summary::-webkit-details-marker { display: none; } /* Hides arrow in Safari/Chrome */
         summary:hover { background-color: var(--summary-hover); }
 
+        /* Create the custom arrow */
+        summary::before {
+            content: '▶';
+            font-size: 0.7em;
+            margin-right: 15px;
+            transition: transform 0.2s ease;
+            color: var(--text-color);
+        }
+
+        /* Rotate the custom arrow downwards when the dropdown is open */
+        details[open] summary::before {
+            transform: rotate(90deg);
+        }
+
         .controls-container {
-            height: calc(100vh - 180px); /* TODO: should be the space between 10px below the sticky header and 10px above the bottom of the viewport */
+            height: calc(100vh - 150px); /* The space between 10px below the sticky header and 10px above the bottom of the viewport */
             position: sticky;
             top: 100px;
             margin-top: 10px;
@@ -204,9 +228,14 @@
             flex-grow: 1;
             background-color: var(--card-bg);
             gap: 15px;
+
+            overflow-y: auto; 
+            scrollbar-width: thin;
         }
 
         .media-container {
+            /* flex: 1;  <- This fucks up the sizing of the sidebar and the cards without solving the problem
+            width: 100%; */
         }
 
         .theme-toggle {
@@ -223,13 +252,13 @@
 
         .no-scroll {
             overflow: hidden;
-            height: 100%; /* Ensures height is locked */
+            height: 100%;
         }
 
         .modal {
-            display: none; /* Hidden by default */
-            position: fixed; /* Stay in place */
-            z-index: 1; /* Sit on top of everything but the header */
+            display: none;
+            position: fixed;
+            z-index: 1001;
             left: 0;
             top: 0;
             width: 100%;
@@ -237,30 +266,32 @@
             background-color: rgba(0,0,0,0.4); /* Black w/ opacity */
 
             justify-content: center;
-            align-items: center;  /* TODO: The details card is being centered on the screen, not the space below the sticky header */
+            align-items: center;
         }
 
         .modal-content {
             background-color: var(--header-bg);
             padding: 20px;
-            width: 80%; /* Could be more or less, depending on screen size */
-            max-height: 90vh; /* Prevents it from overflowing the screen height */
+            width: 80%;
             border-radius: 8px;
             display: flex;
             flex-direction: column;
-            align-items: left;
             box-shadow: 0 4px 20px var(--shadow);
             gap: 10px;
             justify-content: space-between;
+            max-height: 80vh;
+            overflow: hidden;
         }
 
-        .details-container {
+        .details-container { /* This shouldn't scroll */
             display: flex;
             flex-direction: row;
-            align-items: center;
+            /* align-items: center; */
             gap: 15px;
-            /* flex: 0 0 805px; /* TODO: Trying to get the lists to wrap down and be below the main-details-container before the elements in the watch history cards start wrapping, but it's not working, and this being in here messes it up because it doesn't let the details window shrink vertically around the details when they're smaller. */
-            flex-wrap: wrap;
+            /* flex-wrap: wrap; */ /* TODO: had to get rid of this so that the history would scroll, but now the lists card doesn't drop below the main-details card when the window gets too thin.*/
+            flex: 1;
+            /*max-height: 80%; /* TODO: doesn't seem to be limiting it. Want to force children to scroll instead of this overflowing */
+            min-height: 0;
         }
 
         .main-details-container {
@@ -269,24 +300,36 @@
             border: 1px solid black;
             border-radius: 8px;
             padding: 15px;
-            flex: 1;
+            flex: 2 1 0; 
+            min-width: 500px;   /* It should still be able to shrink past this, but it should force the list section to wrap underneath it first. */
             box-shadow: 0 2px 5px var(--shadow);
             width: min-content;
-            flex-grow: 2;
             gap: 10px;
-            justify-content: space-between;
+            /* justify-content: space-between; */
             background-color: var(--card-bg);
+            /* max-height: 90%; */
+            min-height: 0;
+            overflow: hidden;
         }
 
         .small-details-container {
             display: flex;
             flex-direction: row;
             gap: 15px;
+            /* flex: 1; */
+            flex: 0 0 auto;
+        }
+
+        .history-wrapper {
+            display: flex;
+            flex-direction: column;
             flex: 1;
+            min-height: 0;
+            overflow: hidden;
         }
 
         .card-list {
-            /* TODO: Should get a scroll bar once there's too many elements */
+            /* TODO: Should get a scroll bar once it would overflow its parent. Can't use set max height because it depends on its parent. Just should get scroll any time it's about to overflow. */
             display: flex;
             flex-direction: column;
             gap: 7px;
@@ -296,6 +339,10 @@
             flex: 1;
             box-shadow: inset 0 0 5px var(--shadow);
             background-color: var(--header-bg);
+            overflow-y: auto;
+            /* Optional: make the scrollbar look nicer */
+            scrollbar-width: thin;
+            min-height: 0;
         }
         .history-card {
             display: flex;
@@ -315,14 +362,19 @@
             border: 1px solid black;
             border-radius: 8px;
             padding: 15px;
-            flex: 1;
+            flex: 1 1 auto;
+            min-width: 400px;
             box-shadow: 0 2px 5px var(--shadow);
             width: max-content; /* TODO: Not sure if this is the right call, but the list names should be short I think, and I don't want to have words wrap on themselves? */
             min-width: fit-content;
             flex-grow: 1;
             background-color: var(--card-bg);
             height: 100%; /* Doesn't actually seem to be doing anything? */
+
+            overflow-y: auto;
+            scrollbar-width: thin;
         }
+        
 
         /* .lists-details-container {
             display: flex;
@@ -348,7 +400,7 @@
             border: 1px solid black;
             border-radius: 8px;
             padding: 10px;
-            flex: 1;
+            /* flex: 1; */
             box-shadow: inset 0 2px 5px var(--shadow);
             white-space: pre-wrap;
             background-color: var(--header-bg);
@@ -367,12 +419,38 @@
             margin-bottom: 1px;
         }
 
+        /* Responsive layout for the Modal */
+        @media (max-width: 980px) {
+            .modal-content {
+                overflow: auto;
+            }
+            
+            .details-container {
+                flex-direction: column; /* Stack the cards vertically */
+                overflow-y: auto;       /* Allow the whole modal body to scroll if needed */
+            }
+
+            .main-details-container {
+                min-width: 0;           /* Release the 500px lock so it shrinks on thin screens */
+                width: 100%;
+                flex: 0 0 auto;
+                height: 60vh;           /* Re-establish a strict height so inner scrolling survives the stack */
+            }
+
+            .lists-section-container {
+                min-width: 0;           /* Release the 400px lock */
+                width: 100%;
+                flex: 0 0 auto;
+                height: 40vh;           /* Give the lists card a defined height so it doesn't collapse */
+            }
+        }
+
 
         /* Styling for the list items in the sidebar */
         .single-select-item {
             display: block;
-            padding: 8px 15px;
-            margin: 2px 0;
+            padding: 5px 15px;
+            /* margin: 2px 0; */
             cursor: pointer;
             border-radius: 6px;
             transition: all 0.2s ease;
@@ -428,7 +506,7 @@
                         <h3 class="details-section-heading">Lists</h3>
                         <div class="card-list" id="list-selector" style="gap: 1px;">
                             <!-- TODO: Show lists [INCLUDING STATUS LISTS] with [single-select] check boxes, probably in order that they were created? Start with all. -->
-                        </div style="margin-bottom: 0;">
+                        </div>
                     </div>
                 </div>
 
@@ -470,9 +548,9 @@
                                 <div id="notes-container" contenteditable="true"></div>
                             </div>
 
-                            <div>
+                            <div class="history-wrapper">
                                 <h2 class="details-section-heading" id="history-section-title">History</h2>
-                                <div class="card-list", id="watch-history-container"></div>
+                                <div class="card-list" id="watch-history-container"></div>
                             </div>
                         </div>
 
@@ -480,10 +558,10 @@
                             <h3 class="details-section-heading">Lists</h3> <!-- h2 is too big but h3 is too small. -->
                             <div class="card-list">
                                 <!-- TODO: Show lists [NOT STATUS LISTS ] with [multi] check boxes, probably in order that they were created? -->
-                            </div style="margin-bottom: 0;">
+                            </div>
                         </div>
                     </div>
-                    <span class="btn" onclick="closeDetails(true)" style="align-self: right; text-align: center; width: fit-content;"><strong>Save</strong></span> <!-- TODO: Should be bottom right -->
+                    <span class="btn" onclick="closeDetails(true)" style="width: fit-content; align-self: flex-end;"><strong>Save</strong></span>
                 </div>
             </div>
         </div>
@@ -675,10 +753,8 @@
 
                 const summary = document.createElement('summary');
                 summary.innerHTML = `
-                    <div style="display: flex; flex-direction: row; justify-content: space-between; align-items: center;">
-                        ${listName} (${ids.length})
-                        <button class="btn" onclick="event.stopPropagation(); addNew('${listName}')">New</button>
-                    </div>
+                    <span style="flex: 1;">${listName} (${ids.length})</span>
+                    <button class="btn" onclick="event.stopPropagation(); addNew('${listName}')">New</button>
                 `;
                 dropdown.appendChild(summary);
 
@@ -829,9 +905,8 @@
                     end = formatDate(history.end_date);
                 }
                 
-                // TODO: The bottom border is too low
                 historyCard.innerHTML = `
-                    <div style="display: flex; flex-direction: row; justify-content: space-between; border-bottom: 1px solid grey; flex: 1; padding-bottom: 0px;">
+                    <div style="display: flex; flex-direction: row; justify-content: space-between; border-bottom: 1px solid grey; padding-bottom: 0px;">
                         <div class="title">${historyTitle} ${count}</div>
                         <div>${history.formatted_status}</div>
                     </div>
