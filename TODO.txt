@@ -1,2 +1,4 @@
-- Make master list for all cards on UI. Store the formatted status and media format in there too
 - Add an extra watch history for all cards in repeating
+- When you're in details for a card and click out, it re-opens all of the dropdowns you closed
+- Allow user to click on a history card and change or delete it
+- ctrl+z to undo?

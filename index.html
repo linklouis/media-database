@@ -74,7 +74,6 @@
         .title {
             font-size: 1.2em;
             font-weight: bold;
-            /* margin-bottom: 10px; */
             cursor: pointer;
             text-decoration: none;
             flex: 1;
@@ -150,6 +149,29 @@
             box-shadow: none;
             transform: translateY(1px);
         }
+        .history-btn {
+            display: inline-block;
+            height: fit-content;
+            padding: 8px 18px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            box-shadow: 0 2px 10px var(--shadow);
+            text-align: center;
+        }
+        .history-btn:hover {
+            background: #2e93ff;
+            transform: translateY(-1px);
+            box-shadow: 0 3px 20px var(--shadow);
+        }
+        .history-btn:active {
+            background: #0056b3;
+            box-shadow: none;
+            transform: translateY(1px);
+        }
+
         .status-COMPLETED { background-color: #28a745; }
         .status-WATCHING, .status-CURRENT { background-color: #007bff; }
         .status-PLANNING { background-color: #6c757d; }
@@ -313,8 +335,9 @@
             display: flex;
             flex-direction: row;
             gap: 15px;
-            /* flex: 1; */
             flex: 0 0 auto;
+            justify-content: space-between;
+            align-items: center;
         }
 
         .history-wrapper {
@@ -326,10 +349,9 @@
         }
 
         .card-list {
-            /* TODO: Should get a scroll bar once it would overflow its parent. Can't use set max height because it depends on its parent. Just should get scroll any time it's about to overflow. */
             display: flex;
             flex-direction: column;
-            gap: 7px;
+            gap: 10px;
             border: 1px solid black;
             border-radius: 8px;
             padding: 13px;
@@ -337,7 +359,6 @@
             box-shadow: inset 0 0 5px var(--shadow);
             background-color: var(--header-bg);
             overflow-y: auto;
-            /* Optional: make the scrollbar look nicer */
             scrollbar-width: thin;
             min-height: 0;
         }
@@ -348,7 +369,7 @@
             border-radius: 8px;
             padding: 10px;
             /* width: max-content; */
-            gap: 8px;
+            gap: 10px;
             background-color: var(--card-bg);
             box-shadow: 0 0 5px var(--shadow);
         }
@@ -401,6 +422,11 @@
             box-shadow: inset 0 2px 5px var(--shadow);
             white-space: pre-wrap;
             background-color: var(--header-bg);
+        }
+        div[contenteditable="true"]:empty::before {
+            content: attr(data-placeholder);
+            color: #888; /* Gray text */
+            pointer-events: none; /* Prevents the placeholder from interfering with text cursor clicks */
         }
 
         .detail-container {
@@ -501,9 +527,7 @@
 
                     <div>
                         <h3 class="details-section-heading">Lists</h3>
-                        <div class="card-list" id="list-selector" style="gap: 1px;">
-                            <!-- TODO: Show lists [INCLUDING STATUS LISTS] with [single-select] check boxes, probably in order that they were created? Start with all. -->
-                        </div>
+                        <div class="card-list" id="list-selector" style="gap: 1px;"></div>
                     </div>
                 </div>
 
@@ -520,29 +544,35 @@
                     </div>
                     <div class="details-container">
                         <div class="main-details-container">
-                            <div class="small-details-container">
-                                <div class="detail-container">
-                                    <label><strong>Status</strong>
-                                        <select id="status-detail">
-                                            <option value="PLANNING">PLANNING</option>
-                                            <option value="CURRENT">CURRENT</option>
-                                            <option value="REPEATING">REPEATING</option>
-                                            <option value="PAUSED">PAUSED</option>
-                                            <option value="DROPPED">DROPPED</option>
-                                        </select>
-                                    </label>
+                            <div class="small-details-container" id="small-details-container">
+                                <div id="left-details" style="display: flex; flex-direction: row;">
+                                    <div class="detail-container">
+                                        <label><strong>Status</strong>
+                                            <select id="status-detail">
+                                                <option value="PLANNING">PLANNING</option>
+                                                <option value="CURRENT">CURRENT</option>
+                                                <option value="REPEATING">REPEATING</option>
+                                                <option value="PAUSED">PAUSED</option>
+                                                <option value="DROPPED">DROPPED</option>
+                                                <option value="COMPLETED">COMPLETED</option>
+                                            </select>
+                                        </label>
+                                    </div>
+                                    <div class="detail-container">
+                                        <label><strong>Score</strong>
+                                            <input type="number" id="score-detail"></input>
+                                        </label>
+                                    </div>
                                 </div>
-                                <div class="detail-container">
-                                    <label><strong>Score</strong>
-                                        <input type="number" id="score-detail"></input>
-                                    </label>
-                                </div>
-                            </div>
 
-                            <div>
-                                <h3 class="details-section-heading">Notes</h3>
-                                <!-- The notes text isn't formatted :( -->
-                                <div id="notes-container" contenteditable="true"></div>
+                                <div id="right-actions" style="display: flex; flex-direction: row; gap: 10px; align-items: center; padding-right: 15px;">
+                                    <button class="history-btn" id="start-btn">Start</button>
+                                    <button class="history-btn" id="finish-btn">Finish</button>
+                                    <button class="history-btn" id="revive-btn">Revive</button>
+                                    <button class="history-btn" id="pause-btn">Pause</button>
+                                    <button class="history-btn" id="continue-btn">Continue</button>
+                                    <button class="history-btn" id="drop-btn">Drop</button>
+                                </div>
                             </div>
 
                             <div class="history-wrapper">
@@ -552,9 +582,9 @@
                         </div>
 
                         <div class="lists-section-container">
-                            <h3 class="details-section-heading">Lists</h3> <!-- h2 is too big but h3 is too small. -->
+                            <h3 class="details-section-heading">Lists</h3>
                             <div class="card-list">
-                                <!-- TODO: Show lists [NOT STATUS LISTS ] with [multi] check boxes, probably in order that they were created? -->
+                                <!-- TODO: Show lists [NOT STATUS LISTS] with [multi] check boxes, in order that they were created -->
                             </div>
                         </div>
                     </div>
@@ -565,13 +595,21 @@
     </div>
 
     <script>
-        const API_URL = "http://127.0.0.1:8000";
+        const API_URL = "http://127.0.0.1:8000";    // TODO: Probably shouldn't be hard-coded
         const allMedia = {};
         let mediaLists = {};
         const modal = document.getElementById("details-modal");
         var selectedList = 'All';
         var selectedMediaType = 'All';
         const mediaFormats = ['Anime', 'Anime Movie', 'AMV', 'Manga', 'Light Novel', 'Live-Action Movie', 'Show', 'Webtoon', 'Book'];
+
+        const startBtn = document.getElementById('start-btn');
+        const finishBtn = document.getElementById('finish-btn');
+        const reviveBtn = document.getElementById('revive-btn');
+        const pauseBtn = document.getElementById('pause-btn');
+        const continueBtn = document.getElementById('continue-btn');
+        const dropBtn = document.getElementById('drop-btn');
+        const historyBtns = [startBtn, finishBtn, reviveBtn, pauseBtn, continueBtn, dropBtn];
 
         window.onclick = function(event) {
             if (event.target == modal) closeDetails(false);
@@ -864,6 +902,47 @@
             }
         })();
 
+        function setupHistoryControlButtons(item) {
+            historyBtns.forEach(btn => {
+                btn.style.display = "none";
+            });
+
+            // TODO: For each button, on click, update item and history object, then call openDetails(mediaId) again to refresh
+            const recentAttempt = item.watch_history.at(-1);
+            if (recentAttempt == undefined) {
+                // There's no watch history
+                startBtn.title = `Start a your first ${item.media_format} attempt!`;
+                startBtn.style.display = "inline-block";
+            } else if (recentAttempt.status === 'IN-PROGRESS') {
+                finishBtn.title = `Finish latest ${item.media_format} attempt and set progress to 100%`;
+                finishBtn.style.display = "inline-block";
+
+                pauseBtn.title = `Pause latest ${item.media_format} attempt`;
+                pauseBtn.style.display = "inline-block";
+
+                dropBtn.title = `Drop latest ${item.media_format} attempt`;
+                dropBtn.style.display = "inline-block";
+            } else if (recentAttempt.status === 'PAUSED') {
+                finishBtn.title = `Finish latest ${item.media_format} attempt and set progress to 100%`;
+                finishBtn.style.display = "inline-block";
+
+                continueBtn.title = `Pick up where you left off`;
+                continueBtn.style.display = "inline-block";
+
+                dropBtn.title = `Drop latest ${item.media_format} attempt`;
+                dropBtn.style.display = "inline-block";
+            } else if (recentAttempt.status === 'DROPPED') {
+                startBtn.title = `Start a new ${item.media_format} attempt`;
+                startBtn.style.display = "inline-block";
+
+                reviveBtn.title = `Bring this ${item.media_format} attempt back from the dead (You should just start a new one)`;
+                reviveBtn.style.display = "inline-block";
+            } else if (recentAttempt.status === 'COMPLETED') {
+                startBtn.title = `Start a new ${item.media_format} attempt`;
+                startBtn.style.display = "inline-block";
+            }
+        }
+
         async function openDetails(mediaId) {
             modal.querySelector('h1').textContent = "Loading media...";
 
@@ -877,15 +956,16 @@
             allMedia[mediaId] = item;
             formatItem(item);
 
-            modal.querySelector('h1').textContent = `${item.title}`;
-            document.getElementById('status-detail').value = `${item.status}`;
+            modal.querySelector('h1').textContent = item.title;
+            document.getElementById('status-detail').value = item.status;
             document.getElementById('score-detail').value = item.score/100;
-            document.getElementById('notes-container').innerText = `${item.watch_history.at(-1).watch_notes}`;
 
             document.getElementById('watch-history-container').innerHTML = "";
             var count = item.watch_history.length;
             const historyTitle = item.media_format.charAt(0).toUpperCase() + item.media_format.slice(1);
             document.getElementById("history-section-title").textContent = historyTitle + " History"
+
+            setupHistoryControlButtons(item);
 
             Object.values(item.watch_history).toReversed().forEach(history => {
                 const historyCard = document.createElement('div');
@@ -904,7 +984,7 @@
                 
                 historyCard.innerHTML = `
                     <div style="display: flex; flex-direction: row; justify-content: space-between; border-bottom: 1px solid grey; padding-bottom: 0px;">
-                        <div class="title">${historyTitle} ${count}</div>
+                        <h3 style="margin: 0px;">${historyTitle} ${count}</h3>
                         <div>${history.formatted_status}</div>
                     </div>
                     <div style="display: flex; flex-direction: row; justify-content: space-between; gap: 20px; max-width: 100%; flex: 1;">
@@ -919,15 +999,14 @@
                         </div>
                     </div>
                     <div>
-                        <label for="history-notes-${mediaId}-${count}"><strong>Notes: </strong></label>
-                        <div id="history-notes-${mediaId}-${count}" contenteditable="true"></div>
+                        
+                        <div id="history-notes-${mediaId}-${count}" contenteditable="true" data-placeholder="Notes..."></div>
                     </div>
                 `;
                 document.getElementById('watch-history-container').appendChild(historyCard);
                 document.getElementById(`start-${mediaId}-${count}`).value = start;
                 document.getElementById(`progress-${mediaId}-${count}`).value = history.progress;
-                document.getElementById(`history-notes-${mediaId}-${count}`).innerText = history.watch_notes;
-                document.getElementById('watch-history-container').appendChild(historyCard);
+                document.getElementById(`history-notes-${mediaId}-${count}`).innerText = history.watch_notes || ""; // TODO: Getting "\n" instead of line breaks in the imported notes
                 count--;
             });
 
@@ -939,6 +1018,9 @@
             document.body.classList.add("no-scroll");
         }
 
+        async function addNew() {
+            // TODO
+        }
 
         // Run the fetch when the page loads
         window.onload = fetchMedia;
