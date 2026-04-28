@@ -2,3 +2,6 @@
 - When you're in details for a card and click out, it re-opens all of the dropdowns you closed
 - Allow user to click on a history card and change or delete it
 - ctrl+z to undo?
+- Put the new list button at the bottom of the 3 list containers
+- Incrementing progress should start a new watch attempt if necessary
+- Should the +1 progress button text be set based on format?
