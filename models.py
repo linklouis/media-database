@@ -22,6 +22,8 @@ class WatchAttempt(BaseModel):
     progress: int
     status: str
     watch_notes: Optional[str] = None
+    start_date: Optional[str] = None
+    end_date: Optional[str] = None
 
 class MediaItem(BaseModel):
     media_id: str = Field(alias="_id")
@@ -35,10 +37,8 @@ class MediaItem(BaseModel):
 
 class DetailsUpdate(BaseModel):
     media_id: str
-    new_progress: int
     new_score: int
     new_status: str
-    new_notes: Optional[str] = None
     watch_history: List[WatchAttempt]
 
     model_config = ConfigDict(populate_by_name=True)

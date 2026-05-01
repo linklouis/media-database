@@ -123,9 +123,6 @@ async def update_media_details(media_id: str, update_data: DetailsUpdate):
     update_doc = {
         "score": update_data.new_score,
         "status": update_data.new_status,
-        "progress": update_data.new_progress,
-        # In a real app, you'd iterate through the watch_history and update each element,
-        # but for now, you can overwrite the whole array if the frontend sends the whole array back.
         "watch_history": [attempt.model_dump() for attempt in update_data.watch_history]
     }
 

@@ -1,0 +1,825 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Personal Media Database</title>
+    <style>
+        :root {
+            --bg-color: #f4f4f9;
+            --card-bg: white;
+            --text-color: #333;
+            --header-bg: white;
+            --header-border: #ddd;
+            --progress-bg: #eee;
+            --shadow: rgba(0,0,0,0.08);
+            --summary-hover: #f0f0f0;
+            --input-bg: white;
+            --input-text: black;
+        }
+
+        /* 2. Define Dark Mode Overrides */
+        .dark-mode {
+            --bg-color: #121212;
+            --card-bg: #1e1e1e;
+            --text-color: #e0e0e0;
+            --header-bg: #181818;
+            --header-border: #333;
+            --progress-bg: #333;
+            --shadow: rgba(0,0,0,0.6);
+            --summary-hover: #252525;
+            --input-bg: #2a2a2a;
+            --input-text: white;
+        }
+        body {
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            justify-content: space-around;
+            font-family: sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            padding: 20px 2%;
+        }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; }
+        .card { 
+            background: var(--card-bg); 
+            padding: 20px; 
+            border-radius: 12px; 
+            box-shadow: 0 4px 12px var(--shadow);
+            display: flex;
+            flex-direction: column;
+            transition: transform 0.2s ease;
+            gap: 6px;
+            justify-content: space-between;
+        }
+        .card-details {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            flex: 1;
+        }
+        .card:hover {
+            transform: translateY(-5px); /* Lift effect on hover */
+        }
+        .title {
+            font-size: 1.2em;
+            font-weight: bold;
+            /* margin-bottom: 10px; */
+            cursor: pointer;
+            text-decoration: none;
+            flex: 1;
+        }
+        .title:hover { text-decoration: underline; }
+        .status { font-size: 0.9em; color: white; padding: 3px 8px; border-radius: 12px; display: inline-block; margin-bottom: 10px; background-color: #555; }
+        .sticky-header {
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            background: var(--header-bg);
+            color: var(--text-color);
+            padding: 15px 20px;
+            border-bottom: 2px solid var(--header-border);
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            box-shadow: 0 2px 5px var(--shadow);
+            border-radius: 6px;
+            align-items: center;
+        }
+        .sticky-header h1 { margin: 0; font-size: 1.5em; text-shadow: 3px 3px 5px var(--shadow);}
+        select {
+            padding: 5px 10px;
+            border-radius: 4px;
+            background: var(--input-bg);
+            color: var(--input-text);
+            border: 1px solid var(--header-border);
+            cursor: pointer;
+            box-shadow: 0 2px 5px var(--shadow);
+        }
+        input {
+            padding: 5px 10px;
+            border-radius: 4px;
+            background: var(--input-bg);
+            color: var(--input-text);
+            border: 1px solid var(--header-border);
+            cursor: pointer;
+            box-shadow: 0 2px 5px var(--shadow);
+        }
+        /* Chrome, Safari, Edge, Opera */
+        /* TODO: Only remove for score input */
+        input::-webkit-outer-spin-button,
+        input::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+
+        /* Firefox */
+        input[type=number] {
+            -moz-appearance: textfield;
+            width: 6ch;
+        }
+
+        .btn {
+            display: block;
+            padding: 8px 18px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            box-shadow: 0 2px 10px var(--shadow);
+        }
+        .btn:hover {
+            background: #2e93ff;
+            transform: translateY(-1px);
+            box-shadow: 0 3px 20px var(--shadow);
+        }
+        .btn:active {
+            background: #0056b3;
+            box-shadow: none;
+            transform: translateY(1px);
+        }
+        .status-COMPLETED { background-color: #28a745; }
+        .status-WATCHING, .status-CURRENT { background-color: #007bff; }
+        .status-PLANNING { background-color: #6c757d; }
+        .status-DROPPED { background-color: #dc3545; }
+        .status-PAUSED { background-color: #ffc107; color: #333 !important; }
+        .progress-container {
+            background: var(--progress-bg);
+            border-radius: 10px;
+            height: 8px;
+            width: 100%;
+            margin: 15px 0;
+            overflow: hidden;
+            flex: 1;
+            box-shadow: 0 1px 3px var(--shadow);
+        }
+        .progress-bar {
+            background: #007bff;
+            height: 100%;
+            transition: width 0.3s ease;
+        }
+        details {
+            margin-top: 10px;
+            margin-bottom: 25px;
+            width: 100%;
+        }
+        summary {
+            margin-bottom: 10px;
+            font-size: 1.6em;
+            font-weight: bold;
+            cursor: pointer;
+            background: var(--card-bg);
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px var(--shadow);
+            position: sticky;
+            top: 100px; /* Should rest just below the main header */
+            /* list-style: none; Removes the default arrow in some browsers */
+        }
+        summary::-webkit-details-marker { display: none; } /* Removes arrow in Safari/Chrome */
+        summary:hover { background-color: var(--summary-hover); }
+
+        .controls-container {
+            height: calc(100vh - 180px); /* TODO: should be the space between 10px below the sticky header and 10px above the bottom of the viewport */
+            position: sticky;
+            top: 100px;
+            margin-top: 10px;
+            display: flex;
+            flex-direction: column;
+            border: 1px solid black;
+            border-radius: 8px;
+            padding: 15px;
+            flex: 1;
+            box-shadow: 0 4px 12px var(--shadow);
+            width: max-content;
+            min-width: fit-content;
+            max-width: 30%;
+            flex-grow: 1;
+            background-color: var(--card-bg);
+            gap: 15px;
+        }
+
+        .media-container {
+        }
+
+        .theme-toggle {
+            margin-left: auto;
+            padding: 8px 12px;
+            cursor: pointer;
+            border-radius: 20px;
+            border: 1px solid var(--header-border);
+            background: var(--card-bg);
+            color: var(--text-color);
+            font-size: 0.8em;
+            box-shadow: 0 2px 5px var(--shadow);
+        }
+
+        .no-scroll {
+            overflow: hidden;
+            height: 100%; /* Ensures height is locked */
+        }
+
+        .modal {
+            display: none; /* Hidden by default */
+            position: fixed; /* Stay in place */
+            z-index: 1; /* Sit on top of everything but the header */
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.4); /* Black w/ opacity */
+
+            justify-content: center;
+            align-items: center;  /* TODO: The details card is being centered on the screen, not the space below the sticky header */
+        }
+
+        .modal-content {
+            background-color: var(--header-bg);
+            padding: 20px;
+            width: 80%; /* Could be more or less, depending on screen size */
+            max-height: 90vh; /* Prevents it from overflowing the screen height */
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            align-items: left;
+            box-shadow: 0 4px 20px var(--shadow);
+            gap: 10px;
+            justify-content: space-between;
+        }
+
+        .details-container {
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            gap: 15px;
+            /* flex: 0 0 805px; /* TODO: Trying to get the lists to wrap down and be below the main-details-container before the elements in the watch history cards start wrapping, but it's not working, and this being in here messes it up because it doesn't let the details window shrink vertically around the details when they're smaller. */
+            flex-wrap: wrap;
+        }
+
+        .main-details-container {
+            display: flex;
+            flex-direction: column;
+            border: 1px solid black;
+            border-radius: 8px;
+            padding: 15px;
+            flex: 1;
+            box-shadow: 0 2px 5px var(--shadow);
+            width: min-content;
+            flex-grow: 2;
+            gap: 10px;
+            justify-content: space-between;
+            background-color: var(--card-bg);
+        }
+
+        .small-details-container {
+            display: flex;
+            flex-direction: row;
+            gap: 15px;
+            flex: 1;
+        }
+
+        .card-list {
+            /* TODO: Should get a scroll bar once there's too many elements */
+            display: flex;
+            flex-direction: column;
+            gap: 7px;
+            border: 1px solid black;
+            border-radius: 8px;
+            padding: 13px;
+            flex: 1;
+            box-shadow: inset 0 0 5px var(--shadow);
+            background-color: var(--header-bg);
+        }
+        .history-card {
+            display: flex;
+            flex-direction: column;
+            border: 1px solid black;
+            border-radius: 8px;
+            padding: 10px;
+            /* width: max-content; */
+            gap: 8px;
+            background-color: var(--card-bg);
+            box-shadow: 0 0 5px var(--shadow);
+        }
+
+        .lists-section-container {
+            display: flex;
+            flex-direction: column;
+            border: 1px solid black;
+            border-radius: 8px;
+            padding: 15px;
+            flex: 1;
+            box-shadow: 0 2px 5px var(--shadow);
+            width: max-content; /* TODO: Not sure if this is the right call, but the list names should be short I think, and I don't want to have words wrap on themselves? */
+            min-width: fit-content;
+            flex-grow: 1;
+            background-color: var(--card-bg);
+            height: 100%; /* Doesn't actually seem to be doing anything? */
+        }
+
+        /* .lists-details-container {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            border: 1px solid black;
+            border-radius: 8px;
+            padding: 3px;
+            flex: 0.6;
+            box-shadow: 0 2px 5px var(--shadow);
+        } */
+
+        /* .notes-container {
+            border: 1px solid black;
+            border-radius: 8px;
+            padding: 10px;
+            flex: 1;
+            box-shadow: inset 0 2px 5px var(--shadow);
+            white-space: pre-wrap;
+        } */
+
+        div[contenteditable="true"] {
+            border: 1px solid black;
+            border-radius: 8px;
+            padding: 10px;
+            flex: 1;
+            box-shadow: inset 0 2px 5px var(--shadow);
+            white-space: pre-wrap;
+            background-color: var(--header-bg);
+        }
+
+        .detail-container {
+            display: flex;
+            flex-direction: column;
+            padding: 10px;
+            width: fit-content;
+        }
+
+        .details-section-heading {
+            margin-top: 0;
+            padding-left: 5px;
+            margin-bottom: 1px;
+        }
+    </style>
+</head>
+<body>
+
+    <div style="max-width: 1400px;">
+        <!-- <h1>My Media Library</h1> --> <!-- I did kinda like having this be separate from the bar, but having be on the bar makes sense for now until the bar maybe fills up more. Or maybe have it be above the bar when we're scrolled to the top of the page, but fall down into the bar when you scroll down?-->
+        <div class="sticky-header">
+            <h1>Media Library</h1>
+            <h3>Total Entries: 0</h3>
+            <label for="sort-order" style="padding-left: 10px;">Sort By:</label>
+            <select id="sort-order" onchange="renderMedia()">
+                <option value="name">Name</option>
+                <option value="score">Score</option>
+                <option value="watch_date">Recently Watched</option>
+                <option value="repeats">Repeats</option>
+                <option value="repeats">Release Date</option> <!-- TODO -->
+            </select>
+            <button class="btn" onclick="addNew('PLANNING')">New</button>
+            <button class="theme-toggle" onclick="toggleDarkMode()" id="theme-btn">🌙 Mode</button>
+        </div>
+
+        <div>
+
+            <div style="display: flex; flex-direction: row; gap: 25px;">
+                <div class="controls-container">
+                    <div>
+                        <h3 class="details-section-heading">Media Type</h3>
+                        <div class="card-list">
+                            <select multiple id="media-type" onchange="renderMedia()">
+                                <option value="anime">Anime</option>
+                                <option value="amovie">Anime Movie</option>
+                                <option value="amv">AMV</option>
+                                <option value="manga">Manga</option>
+                                <option value="ln">Light Novel</option>
+                                <option value="movie">Live-Action Move</option>
+                                <option value="show">Live-Action Show</option>
+                                <option value="webtoon">Webtoon</option>
+                                <option value="book">Book</option>
+                            </select>
+                            <!-- TODO: Should be an actual check-list where you can select multiple-->
+                        </div style="margin-bottom: 0;">
+                    </div>
+
+                    <div>
+                        <h3 class="details-section-heading">Lists</h3>
+                        <div class="card-list">
+                            <!-- TODO: Show lists [INCLUDING STATUS LISTS] with [single-select] check boxes, probably in order that they were created? Start with all. -->
+                        </div style="margin-bottom: 0;">
+                    </div>
+                </div>
+
+                <div class="media-container" id="media-container" class="block" style="width: 100%;">
+                    <h2>Loading media...</h2>
+                </div>
+            </div>
+
+            <div id="details-modal" class="modal">
+                <div class="modal-content">
+                    <div>
+                        <h1 style="margin-bottom: 0; text-shadow: 3px 3px 5px var(--shadow);"></h1>
+                        <hr style="width:100%;">
+                    </div>
+                    <div class="details-container">
+                        <div class="main-details-container">
+                            <div class="small-details-container">
+                                <div class="detail-container">
+                                    <label for="status-detail"><strong>Status</strong></label>
+                                    <select id="status-detail">
+                                        <option value="PLANNING">PLANNING</option>
+                                        <option value="CURRENT">CURRENT</option>
+                                        <option value="REPEATING">REPEATING</option>
+                                        <option value="PAUSED">PAUSED</option>
+                                        <option value="DROPPED">DROPPED</option>
+                                    </select>
+                                </div>
+                                <div class="detail-container">
+                                    <label for="score-detail"><strong>Score</strong></label>
+                                    <input type="number" id="score-detail"></input>
+                                </div>
+                            </div>
+
+                            <div>
+                                <h3 class="details-section-heading">Notes</h3>
+                                <!-- The notes text isn't formatted :( -->
+                                <div id="notes-container" contenteditable="true"></div>
+                            </div>
+
+                            <div>
+                                <h2 class="details-section-heading" id="history-section-title">History</h2>
+                                <div class="card-list", id="watch-history-container"></div>
+                            </div>
+                        </div>
+
+                        <div class="lists-section-container">
+                            <h3 class="details-section-heading">Lists</h3> <!-- h2 is too big but h3 is too small. -->
+                            <div class="card-list">
+                                <!-- TODO: Show lists [NOT STATUS LISTS ] with [multi] check boxes, probably in order that they were created? -->
+                            </div style="margin-bottom: 0;">
+                        </div>
+                    </div>
+                    <span class="btn" onclick="closeDetails(true)" style="align-self: right; text-align: center; width: fit-content;"><strong>Save</strong></span> <!-- TODO: Should be bottom right -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = "http://127.0.0.1:8000";
+        const allMedia = {};
+        let mediaLists = {};
+        const modal = document.getElementById("details-modal");
+
+        window.onclick = function(event) {
+            if (event.target == modal) closeDetails(false);
+        } 
+
+        window.addEventListener('keydown', (e) => {
+            if (e.key === "Escape" && modal.style.display === "block") closeDetails(false);
+        });
+
+        function closeDetails(save) {
+            if (save) {
+                alert('Saving');
+            } else {
+                // alert('Not saving');
+            }
+            modal.style.display = "none";
+            document.body.classList.remove("no-scroll");
+            renderMedia();
+        }
+
+        function getMediaFormat(mediaType) {
+            if (["Anime", "Anime Movie", "AMV", "Live-Action Movie", "Live-Action Show"].includes(mediaType)) {
+                return "watch";
+            } else if (["Manga", "Light Novel", "Webtoon", "Book"].includes(mediaType)) {
+                return "read";
+            }
+        }
+
+        function formatDate(dateString) {
+            if (dateString) {
+                return new Date(dateString).toISOString().split('T')[0];
+            } else {
+                return new Date().toISOString().split('T')[0];
+            }
+        }
+
+        function getFormattedStatus(item, mediaFormat) {
+            var itemStatus = item.status;
+            if (mediaFormat == "watch") {
+                switch (item.status) {
+                    case "CURRENT": { itemStatus = "WATCHING"; break; }
+                    case "REPEATING": { itemStatus = "RE-WATCHING"; break; }
+                }
+            } else if (mediaFormat == "read") {
+                switch (item.status) {
+                    case "CURRENT": { itemStatus = "READING"; break; }
+                    case "REPEATING": { itemStatus = "RE-READING"; break; }
+                }
+            } else {
+                itemStatus = "ERROR: MEDIA TYPE NOT RECOGNIZED";
+            }
+            return itemStatus;
+        }
+
+        function formatItem(rawItem) {
+            rawItem["media_format"] = getMediaFormat(rawItem.media_type);
+            rawItem["formatted_status"] = getFormattedStatus(rawItem, rawItem.media_format);    // TODO: Should maybe do this lazily?
+            rawItem.watch_history.forEach(history => {
+                history["formatted_status"] = getFormattedStatus(history, rawItem.media_format);
+            });
+        }
+
+        function getProgress(item) {
+            if (item.watch_history.length != 0) {
+                return item.watch_history[item.watch_history.length - 1].progress;
+            } else {
+                // alert(`${item.title} has no watch history. Is that ok?`);
+                return 0;
+            }
+        }
+        
+        async function fetchMedia() {
+            try {
+                const response = await fetch(`${API_URL}/media/`);
+                if (!response.ok) throw new Error("Network response was not ok");
+                
+                const rawMedia = await response.json();
+                mediaLists = {
+                    CURRENT:[],
+                    REPEATING:[],
+                    PLANNING:[],
+                    COMPLETED:[],
+                    PAUSED:[],
+                    DROPPED:[]
+                };
+
+                rawMedia.forEach(item => {
+                    allMedia[item._id] = item;
+                    formatItem(item);
+                    
+                    if (!(item.status in mediaLists)) {
+                        mediaLists[item.status] = [];
+                    }
+                    mediaLists[item.status].push(item._id)
+
+                    for (const list of item.lists) {
+                        if (!(list in mediaLists)) {
+                            mediaLists[list] = [];
+                        }
+                        mediaLists[list].push(item._id);
+                    }
+                });
+                
+                renderMedia();
+
+                document.querySelector(".sticky-header h3").textContent = `Total Entries: ${rawMedia.length}`;
+            } catch (error) {
+                console.error("Error fetching data:", error);
+                document.getElementById('media-container').innerHTML = "<p>Error loading database. Is the server running?</p>";
+            }
+        }
+
+        function renderMedia() {
+            const container = document.getElementById('media-container');
+            container.innerHTML = ""; // Clear the loading text
+            
+            Object.entries(mediaLists).forEach(([listName, ids]) => {
+                const dropdown = document.createElement('details');
+                dropdown.setAttribute('open', '');
+
+                const summary = document.createElement('summary');
+                summary.textContent = `${listName} (${ids.length})`; // TODO: Make the number of elements be on the far right side?
+                // TODO: dropdown arrow is now
+                summary.innerHTML = `
+                    <div style="display: flex; flex-direction: row; justify-content: space-between;">
+                        ${listName} (${ids.length})
+                        <button class="btn" onclick="addNew(${listName})">New</button>
+                    </div>
+                `;
+                // const newBtn = document.createElement('button');
+                // newBtn.className = 'btn';
+                // newBtn.textContent = 'New';
+                // newBtn.
+                // summary.appendChild(newBtn);
+                dropdown.appendChild(summary);
+
+                const grid = document.createElement('div');
+                grid.className = 'grid';
+                dropdown.appendChild(grid);
+
+                const sorting = document.getElementById('sort-order').value;
+
+                switch (sorting) {
+                    case "name": {ids.sort((a, b) => allMedia[a].title.localeCompare(allMedia[b].title)); break;}
+                    case "score": {items.sort((a, b) => (allMedia[b].score || 0) - (allMedia[a].score || 0)); break;}
+                    case "repeats": {items.sort((a, b) => (allMedia[b].repeats || 0) - (allMedia[a].repeats || 0)); break;}
+                    case "watch_date": {
+                        items.sort((a, b) => {
+                            // Get the latest date from the history, or a very old date if empty
+                            const dateA = allMedia[a].watch_history.length > 0 
+                                ? new Date(allMedia[a].watch_history[allMedia[a].watch_history.length - 1].start_date) 
+                                : new Date(0);
+                            const dateB = allMedia[b].watch_history.length > 0 
+                                ? new Date(allMedia[b].watch_history[allMedia[b].watch_history.length - 1].start_date) 
+                                : new Date(0);
+                            return dateB - dateA; // Descending (Newest first)
+                        });
+                        break;
+                    }
+                }
+
+
+                ids.forEach(id => {
+                    item = allMedia[id];
+                    // Calculate display score
+                    const displayScore = item.score ? (item.score / 100).toFixed(1) : "N/A";
+                    var progress = getProgress(item);
+
+                    let percent = 0;
+                    if (item.total_units && item.total_units > 0) {
+                        percent = (progress / item.total_units) * 100;
+                    }
+                    if (percent > 100) {
+                        alert(`PERCENT COMPLETION IS FUCKED UP FOR ${item.title}`);
+                        percent = 100;
+                    }
+
+                    // Create the card HTML
+                    const card = document.createElement('div');
+                    card.className = 'card';
+                    card.innerHTML = `
+                        <div class="title" onclick="openDetails('${item._id}')">${item.title}</div>
+                        <div class="card-details">
+                            <div class="status status-${item.status}">${item.formatted_status}</div>
+                            <div style="display: flex; width: 100%; justify-content: space-between; align-items: center;">
+                                <div><strong>${item.media_type}<strong></div>
+                                <div>${displayScore} / 10</div>
+                            </div>
+                            <div style="display: flex; width: 100%; align-items: center; gap: 5px;">
+                                <label for="progress-container-${item._id}" id="progress-${item._id}">${progress} / ${item.total_units}</label>
+                                <div class="progress-container" id="progress-container-${item._id}">
+                                    <div class="progress-bar" style="width: ${percent}%" id="progress-bar-${item._id}"></div>
+                                </div>
+                            </div>
+                            <button class="btn" style="width: 100%;" onclick="logWatch('${item._id}', '${item.media_type}', event)">+1 Progress</button>
+                        </div>
+                        `;
+                    grid.appendChild(card);
+                });
+                container.appendChild(dropdown);
+            });
+        }
+
+        async function logWatch(mediaId, mediaType, event) {
+            event.stopPropagation();
+            try {
+                const response = await fetch(`${API_URL}/activity/`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        media_id: mediaId,
+                        media_type: mediaType,
+                        action_type: "PROGRESS_UPDATE",
+                        progress_added: 1
+                    })
+                });
+
+                if (!response.ok) {
+                    alert("Database update failed! Check server logs.");
+                    return;
+                }
+
+                const freshItem = await response.json();
+
+                Object.keys(mediaLists).forEach(list => {
+                    const index = mediaLists[list].findIndex(i => i._id === mediaId);
+                    if (index !== -1) mediaLists[list][index] = freshItem;
+                });
+
+                const newProgress = getProgress(freshItem);
+                const total = freshItem.total_units || '?';
+                let percent = (total !== '?') ? (newProgress / total) * 100 : 0;
+                if (percent > 100) percent = 100;
+
+                document.querySelectorAll(`#progress-${mediaId}`).forEach(el => {
+                    el.innerHTML = `${newProgress} / ${total}`;
+                });
+
+                document.querySelectorAll(`#progress-bar-${mediaId}`).forEach(bar => {
+                    bar.style.width = `${percent}%`;
+                });
+
+            } catch (error) {
+                console.error('Network Error:', error);
+            }
+        }
+
+        function toggleDarkMode() {
+            const body = document.body;
+            const btn = document.getElementById('theme-btn');
+            
+            body.classList.toggle('dark-mode');
+            
+            const isDark = body.classList.contains('dark-mode');
+            localStorage.setItem('theme', isDark ? 'dark' : 'light');
+            btn.textContent = isDark ? '☀️ Mode' : '🌙 Mode';
+        }
+
+        (function() {
+            const savedTheme = localStorage.getItem('theme');
+            if (savedTheme === 'dark') {
+                document.body.classList.add('dark-mode');
+                document.getElementById('theme-btn').textContent = '☀️ Mode';
+            }
+        })();
+
+        async function openDetails(mediaId) {
+            modal.querySelector('h1').textContent = "Loading media...";
+
+            const response = await fetch(`${API_URL}/media/${mediaId}`);
+            if (!response.ok) throw new Error("Network response was not ok");
+            
+            const item = await response.json();
+            if (mediaId != item._id) {
+                alert("SOMETHING HAS GONE TERRIBLY WRONG, WE GOT THE WRONG MEDIA IN OPEN DETAILS");
+            }
+            allMedia[mediaId] = item;
+            formatItem(item);
+            // TODO: Need to actually update the rendering.
+            // TODO: (done?) Rather than having a bunch of copies of the same object, it probably makes more sense to have one dict that's just all of the shows by their ids, and then another dict that's arrays of ids by their categories. That way I could just update it in one spot, and then call for a UI update of one ID.
+
+            modal.querySelector('h1').textContent = `${item.title}`;
+            document.getElementById('status-detail').value = `${item.status}`;
+            document.getElementById('score-detail').value = item.score/100;
+            document.getElementById('notes-container').innerText = `${item.watch_history.at(-1).watch_notes}`;
+
+            document.getElementById('watch-history-container').innerHTML = "";
+            var count = item.watch_history.length;
+            const historyTitle = item.media_format.charAt(0).toUpperCase() + item.media_format.slice(1);
+            document.getElementById("history-section-title").textContent = historyTitle + " History"
+
+            Object.values(item.watch_history).toReversed().forEach(history => {
+                const historyCard = document.createElement('div');
+                historyCard.className = 'history-card';
+                
+                let start = "Unknown";
+                let end = "Unknown";
+                if (history.start_date) {
+                    start = formatDate(history.start_date);
+                    end = history.end_date ? formatDate(history.end_date) : formatDate();
+                } else if(history.status == "IN-PROGRESS") {
+                    end = history.end_date ? formatDate(history.end_date) : formatDate();
+                } else if (history.end_date) {
+                    end = formatDate(history.end_date);
+                }
+                
+                // TODO: The bottom border is too low
+                historyCard.innerHTML = `
+                    <div style="display: flex; flex-direction: row; justify-content: space-between; border-bottom: 1px solid grey; flex: 1; padding-bottom: 0px;">
+                        <div class="title">${historyTitle} ${count}</div>
+                        <div>${history.formatted_status}</div>
+                    </div>
+                    <div style="display: flex; flex-direction: row; justify-content: space-between; gap: 20px; max-width: 100%; flex: 1;">
+                        <div style="flex: 0 1 auto;">
+                            <input type="date" id="start-${mediaId}-${count}"></input>
+                             - 
+                            <input type="date" value="${end}"></input>
+                        </div>
+                        <div style="flex: 0 1 auto;">
+                            <label for="progress-${mediaId}-${count}"><strong>Progress: </strong></label>
+                            <input type="number" id="progress-${mediaId}-${count}"></input>
+                        </div>
+                    </div>
+                    <div>
+                        <label for="history-notes-${mediaId}-${count}"><strong>Notes: </strong></label>
+                        <div id="history-notes-${mediaId}-${count}" contenteditable="true"></div>
+                    </div>
+                `;
+                document.getElementById('watch-history-container').appendChild(historyCard);
+                document.getElementById(`start-${mediaId}-${count}`).value = start;
+                document.getElementById(`progress-${mediaId}-${count}`).value = history.progress;
+                document.getElementById(`history-notes-${mediaId}-${count}`).innerText = history.watch_notes;
+                document.getElementById('watch-history-container').appendChild(historyCard);
+                count--;
+            });
+
+            // TODO: Populate lists
+            // Need to have some kind of a global list of all of the lists the user has defined.
+
+
+            modal.style.display = "flex";
+            document.body.classList.add("no-scroll");
+        }
+
+
+        // Run the fetch when the page loads
+        window.onload = fetchMedia;
+    </script>
+
+</body>
+</html>

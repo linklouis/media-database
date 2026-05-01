@@ -515,6 +515,17 @@
         .multi-select-item input:checked ~ .checkmark:after {
             display: block;
         }
+
+        .new-list-btn {
+            display: block;
+            padding: 4px 18px;
+            background: none;
+            color: grey;
+            border: 1px solid grey;
+            border-radius: 4px;
+            cursor: pointer;
+            text-align: center;
+        }
     </style>
 </head>
 <body>
@@ -523,8 +534,13 @@
         <!-- <h1>My Media Library</h1> --> <!-- I did kinda like having this be separate from the bar, but having it be on the bar makes sense for now until the bar maybe fills up more. Or maybe have it be above the bar when we're scrolled to the top of the page, but fall down into the bar when you scroll down?-->
         <div class="sticky-header">
             <h1>Media Library</h1>
-            <h3>Total Entries: 0</h3>
-            <label style="padding-left: 10px;">Sort By:
+            <h3>0 Entries</h3>
+            <search>
+                <form>
+                    <input class="search-bar" name="fsrch" id="fsrch" placeholder="🔍︎" style="border-radius: 15px; cursor: text;"> <!-- TODO: looks bad when selected -->
+                </form>
+            </search>
+            <label style="padding-left: 10px;">Sort
                 <select id="sort-order" onchange="renderMedia()">
                     <option value="name">Name</option>
                     <option value="score">Score</option>
@@ -535,7 +551,7 @@
             </label>
             
             <button class="btn" onclick="addNew('PLANNING')">New</button>
-            <button class="theme-toggle" onclick="toggleDarkMode()" id="theme-btn">🌙 Mode</button>
+            <button class="theme-toggle" onclick="toggleDarkMode()" id="theme-btn">⏾ Mode</button>
         </div>
 
         <div>
@@ -569,9 +585,10 @@
                         <div class="main-details-container">
                             <div class="small-details-container" id="small-details-container">
                                 <div id="left-details" style="display: flex; flex-direction: row;">
-                                    <div class="detail-container">
+                                    <!-- TODO: get rid of this because we have the action buttons now? -->
+                                    <!-- <div class="detail-container">
                                         <label><strong>Status</strong>
-                                            <select id="status-detail">
+                                            <select id="status-detail" onchange="changeStatus(currentOpenMediaId, this.value)"> 
                                                 <option value="PLANNING">PLANNING</option>
                                                 <option value="CURRENT">CURRENT</option>
                                                 <option value="REPEATING">REPEATING</option>
@@ -580,21 +597,26 @@
                                                 <option value="COMPLETED">COMPLETED</option>
                                             </select>
                                         </label>
-                                    </div>
+                                    </div> -->
                                     <div class="detail-container">
                                         <label><strong>Score</strong>
-                                            <input type="number" id="score-detail"></input>
+                                            <input type="number" id="score-detail" onChange="editingItem.score = this.value * 100"></input>
+                                        </label>
+                                    </div>
+                                    <div class="detail-container">
+                                        <label><strong>Progress</strong>
+                                            <input type="number" id="progress-detail" onchange="editingItem.watch_history.at(-1).progress = this.value"></input>
                                         </label>
                                     </div>
                                 </div>
 
                                 <div id="right-actions" style="display: flex; flex-direction: row; gap: 10px; align-items: center; padding-right: 15px;">
                                     <button class="history-btn" id="start-btn">Start</button>
-                                    <button class="history-btn" id="finish-btn">Finish</button>
+                                    <button class="history-btn" id="finish-btn" onclick="changeStatus(currentOpenMediaId, 'finish')">Finish</button>
                                     <button class="history-btn" id="revive-btn">Revive</button>
                                     <button class="history-btn" id="pause-btn">Pause</button>
                                     <button class="history-btn" id="continue-btn">Continue</button>
-                                    <button class="history-btn" id="drop-btn">Drop</button>
+                                    <button class="history-btn" id="drop-btn" onclick="changeStatus(currentOpenMediaId, 'drop')">Drop</button>
                                 </div>
                             </div>
 
@@ -606,12 +628,13 @@
 
                         <div class="lists-section-container">
                             <h3 class="details-section-heading">Lists</h3>
-                            <div class="card-list" id="modal-list-container">
-                                <!-- TODO: Show lists [NOT STATUS LISTS] with [multi] check boxes, in order that they were created -->
-                            </div>
+                            <div class="card-list" id="modal-list-container"></div>
                         </div>
                     </div>
-                    <span class="btn" onclick="closeDetails(true)" style="width: fit-content; align-self: flex-end;"><strong>Save</strong></span>
+                    <div style="display: flex; flex-direction: row; width: 100%;">
+                        <span class="btn" onclick="deleteMedia()" style="width: fit-content; background-color: red;"><strong>Delete</strong></span> <!-- TODO: Kind of an agressive red -->
+                        <span class="btn" onclick="closeDetails(true)" style="width: fit-content; margin-left: auto;"><strong>Save</strong></span>
+                    </div>
                 </div>
             </div>
         </div>
@@ -625,6 +648,8 @@
         var selectedList = 'All';
         var selectedMediaType = 'All';
         const mediaFormats = ['Anime', 'Anime Movie', 'AMV', 'Manga', 'Light Novel', 'Live-Action Movie', 'Show', 'Webtoon', 'Book'];
+        let currentOpenMediaId = null;
+        let editingItem = null;
 
         const startBtn = document.getElementById('start-btn');
         const finishBtn = document.getElementById('finish-btn');
@@ -634,6 +659,12 @@
         const dropBtn = document.getElementById('drop-btn');
         const historyBtns = [startBtn, finishBtn, reviveBtn, pauseBtn, continueBtn, dropBtn];
 
+        const newListBtnHTML = `<button class="new-list-btn" onclick="newList()">New</button>`; // TODO: Add hover effect? Maybe filling the button in and inverting the text?
+
+        /*
+         * HELPER FUNCTIONS:
+         */
+
         window.onclick = function(event) {
             if (event.target == modal) closeDetails(false);
         } 
@@ -641,17 +672,6 @@
         window.addEventListener('keydown', (e) => {
             if (e.key === "Escape" && modal.style.display === "block") closeDetails(false);
         });
-
-        function closeDetails(save) {
-            if (save) {
-                alert('Saving');
-            } else {
-                // alert('Not saving');
-            }
-            modal.style.display = "none";
-            document.body.classList.remove("no-scroll");
-            renderMedia();
-        }
 
         function addSingleSelectOption(name, list) {
             let listOption = document.createElement('div');
@@ -717,11 +737,44 @@
             if (item.watch_history.length != 0) {
                 return item.watch_history[item.watch_history.length - 1].progress;
             } else {
-                // alert(`${item.title} has no watch history. Is that ok?`);
                 return 0;
             }
         }
-        
+
+        function changeStatus(mediaId, button) {
+            const item = allMedia[mediaId];
+            const history = item.watch_history.at(-1);
+            if (button == 'start') {
+                item.status = 'CURRENT';
+                history.status = 'IN-PROGRESS';
+                // TODO Start a new watch history
+            } else if (button == 'finish') {
+                item.status = 'COMPLETED';
+                history.end_date = new Date();
+                history.status = 'COMPLETED';
+            } else if (button == 'revive') {
+                item.status = 'CURRENT';
+                history.status = 'IN-PROGRESS';
+                history.end_date = null;
+            } else if (button == 'pause') {
+                item.status = 'PAUSED';
+                history.status = 'PAUSED';
+                history.end_date = null;
+            } else if (button == 'continue') {
+                item.status = 'CURRENT';
+                history.status = 'IN-PROGRESS';
+            } else if (button == 'drop') {
+                item.status = 'DROPPED';
+                history.end_date = new Date();
+                history.status = 'DROPPED';
+            }
+        }
+
+
+        /*
+         * PRIMARY FUNCTION DEFINITIONS:
+         */
+
         async function fetchMedia() {
             try {
                 const response = await fetch(`${API_URL}/media/`);
@@ -756,7 +809,7 @@
                 
                 renderMedia();
 
-                document.querySelector(".sticky-header h3").textContent = `Total Entries: ${rawMedia.length}`;
+                document.querySelector(".sticky-header h3").textContent = `${rawMedia.length} Entries`;
             } catch (error) {
                 console.error("Error fetching data:", error);
                 document.getElementById('media-container').innerHTML = "<p>Error loading database. Is the server running?</p>";
@@ -860,6 +913,8 @@
                 });
                 container.appendChild(dropdown);
             });
+
+            listSelector.innerHTML += newListBtnHTML;
         }
 
         async function logWatch(mediaId, mediaType, event) {
@@ -914,14 +969,14 @@
             
             const isDark = body.classList.contains('dark-mode');
             localStorage.setItem('theme', isDark ? 'dark' : 'light');
-            btn.textContent = isDark ? '☀️ Mode' : '🌙 Mode';
+            btn.innerHTML = isDark ? `<strong>☀︎<\strong> Mode` : `<strong>⏾<\strong> Mode`;
         }
 
         (function() {
             const savedTheme = localStorage.getItem('theme');
             if (savedTheme === 'dark') {
                 document.body.classList.add('dark-mode');
-                document.getElementById('theme-btn').textContent = '☀️ Mode';
+                document.getElementById('theme-btn').innerHTML = `<strong>☀︎<\strong> Mode`;
             }
         })();
 
@@ -971,16 +1026,21 @@
             const response = await fetch(`${API_URL}/media/${mediaId}`);
             if (!response.ok) throw new Error("Network response was not ok");
             
-            const item = await response.json();
+            var item = await response.json();
             if (mediaId != item._id) {
                 alert("SOMETHING HAS GONE TERRIBLY WRONG, WE GOT THE WRONG MEDIA IN OPEN DETAILS");
             }
             allMedia[mediaId] = item;
             formatItem(item);
 
+            editingItem = JSON.parse(JSON.stringify(item));
+            currentOpenMediaId = mediaId;
+            item = editingItem;
+
             modal.querySelector('h1').textContent = item.title;
-            document.getElementById('status-detail').value = item.status;
+            // document.getElementById('status-detail').value = item.status;
             document.getElementById('score-detail').value = item.score/100;
+            document.getElementById('progress-detail').value = Object.values(item.watch_history).at(-1).progress;
 
             document.getElementById('watch-history-container').innerHTML = "";
             var count = item.watch_history.length;
@@ -1011,27 +1071,33 @@
                     </div>
                     <div style="display: flex; flex-direction: row; justify-content: space-between; gap: 20px; max-width: 100%; flex: 1;">
                         <div style="flex: 0 1 auto;">
-                            <input type="date" id="start-${mediaId}-${count}"></input>
+                            <input type="date" id="start-${mediaId}-${count}" onchange="history.start_date = this.value"></input>
                              - 
-                            <input type="date" value="${end}"></input>
+                            <input type="date" value="${end}" onchange="history.end_date = this.value"></input>
                         </div>
                         <div style="flex: 0 1 auto;">
-                            <label for="progress-${mediaId}-${count}"><strong>Progress: </strong></label>
-                            <input type="number" id="progress-${mediaId}-${count}"></input>
+                            <label for="progress-${mediaId}-${count}"><strong>Progress: </strong>
+                                <input type="number" id="progress-${mediaId}-${count}"></input>
+                                / ${item.total_units}
+                            </label>
                         </div>
                     </div>
                     <div>
                         
-                        <div id="history-notes-${mediaId}-${count}" contenteditable="true" data-placeholder="Notes..."></div>
+                        <div id="history-notes-${mediaId}-${count}" contenteditable="true" data-placeholder="Notes..." oninput="history.watch_notes = this.textContent"></div>
                     </div>
                 `;
                 document.getElementById('watch-history-container').appendChild(historyCard);
                 document.getElementById(`start-${mediaId}-${count}`).value = start;
                 document.getElementById(`progress-${mediaId}-${count}`).value = history.progress;
-                document.getElementById(`history-notes-${mediaId}-${count}`).innerText = history.watch_notes || ""; // TODO: Getting "\n" instead of line breaks in the imported notes
+                const rawNotes = history.watch_notes || "";
+                const formattedNotes = rawNotes.replace(/(?:\r\n|\r|\n|\\n)/g, "<br>");
+                document.getElementById(`history-notes-${mediaId}-${count}`).innerHTML = formattedNotes;
                 count--;
             });
 
+            const listContainer = document.getElementById("modal-list-container");
+            listContainer.innerHTML = "";
             Object.keys(mediaLists).forEach(listName => {
                 let listOption = document.createElement('div');
                 const isActive = (selectedList === listName) ? 'active' : '';
@@ -1042,16 +1108,53 @@
                         <span class="checkmark"></span>
                     </label>
                     `;
-                document.getElementById("modal-list-container").appendChild(listOption);
+                listContainer.appendChild(listOption);
             });
 
-
+            listContainer.innerHTML += newListBtnHTML;
             modal.style.display = "flex";
             document.body.classList.add("no-scroll");
         }
 
+        async function closeDetails(save) {
+            if (save) {
+
+                const response = await fetch(`${API_URL}/media/${currentOpenMediaId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        media_id: currentOpenMediaId,
+                        new_score: editingItem.score,
+                        new_status: editingItem.status,
+                        watch_history: editingItem.watch_history
+                    })
+                });
+
+                if (!response.ok) {
+                    alert("Database update failed! Check server logs.");
+                } else {
+                    const freshItem = await response.json();
+                    formatItem(freshItem);
+
+                    Object.keys(mediaLists).forEach(list => {
+                        const index = mediaLists[list].findIndex(i => i._id === currentOpenMediaId);
+                        if (index !== -1) mediaLists[list][index] = freshItem;
+                    });
+                    renderMedia();
+                }
+            }
+
+            modal.style.display = "none";
+            document.body.classList.remove("no-scroll");
+            currentOpenMediaId = null;
+        }
+
         async function addNew() {
             // TODO
+        }
+
+        function newList() {
+            // TODO: turn button into a text box and accept name
         }
 
         // Run the fetch when the page loads

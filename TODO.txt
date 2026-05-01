@@ -1,7 +1,17 @@
 - Add an extra watch history for all cards in repeating
 - When you're in details for a card and click out, it re-opens all of the dropdowns you closed
-- Allow user to click on a history card and change or delete it
+- Allow user to click on a history card('s title) and change or delete it
 - ctrl+z to undo?
-- Put the new list button at the bottom of the 3 list containers
 - Incrementing progress should start a new watch attempt if necessary
 - Should the +1 progress button text be set based on format?
+- Add delete button to details card
+- Put increment buttons back on progress inputs in details
+- Search bar
+- Add video game and VR game media formats?
+- Just don't have progress bar at all for things with only one entry?
+- Status displayed in details should be formatted (will have to update closeDetails too)
+- Media titles and formats should be editable
+- Add option for score format
+- Lists in details should only be selected if the media is in that list
+- Clean up variable names? (watchHistory stuff should just be history, css names to better follow standards, etc.)
+- Add stats page (Probably need to change the way the header bar works)
