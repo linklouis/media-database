@@ -22,8 +22,8 @@ class WatchAttempt(BaseModel):
     progress: int
     status: str
     watch_notes: Optional[str] = None
-    start_date: Optional[str] = None
-    end_date: Optional[str] = None
+    start_date: Optional[datetime] = None
+    end_date: Optional[datetime] = None
 
 class MediaItem(BaseModel):
     media_id: str = Field(alias="_id")

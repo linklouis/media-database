@@ -153,5 +153,37 @@ async def update_media_details(media_id: str, update_data: DetailsUpdate):
     raise HTTPException(status_code=404, detail="Media not found after update")
 
 
+@app.get("/stats/lists")
+async def get_list_stats():
+    pipeline = [
+        {"$unwind": "$lists"},
+        
+        {"$lookup": {
+            "from": "lists",
+            "localField": "lists",
+            "foreignField": "name",
+            "as": "list_details"
+        }},
+        
+        {"$unwind": "$list_details"},
+        
+        {"$group": {
+            "_id": "$lists", # Group by the list name
+            "media_count": {"$sum": 1},
+            "average_score": {"$avg": "$score"},
+            "color": {"$first": "$list_details.color"},
+            "description": {"$first": "$list_details.description"}
+        }},
+        
+        {"$sort": {"media_count": -1}}
+    ]
+
+    # Run the aggregation
+    cursor = db.media.aggregate(pipeline)
+    results = await cursor.to_list(length=100)
+    
+    return results
+
+
 if __name__ == "__main__":
     uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)

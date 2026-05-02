@@ -549,8 +549,8 @@
                     <option value="repeats">Release Date</option> <!-- TODO -->
                 </select>
             </label>
-            
             <button class="btn" onclick="addNew('PLANNING')">New</button>
+
             <button class="theme-toggle" onclick="toggleDarkMode()" id="theme-btn">⏾ Mode</button>
         </div>
 
@@ -744,10 +744,14 @@
         function changeStatus(mediaId, button) {
             const item = allMedia[mediaId];
             const history = item.watch_history.at(-1);
+
             if (button == 'start') {
                 item.status = 'CURRENT';
-                history.status = 'IN-PROGRESS';
-                // TODO Start a new watch history
+                item.watch_history.push({
+                    progress: 0,
+                    status: 'IN-PROGRESS',
+                    start_date: new Date()
+                });
             } else if (button == 'finish') {
                 item.status = 'COMPLETED';
                 history.end_date = new Date();
@@ -768,6 +772,7 @@
                 history.end_date = new Date();
                 history.status = 'DROPPED';
             }
+            // TODO: Update UI
         }
 
 
@@ -937,11 +942,7 @@
                 }
 
                 const freshItem = await response.json();
-
-                Object.keys(mediaLists).forEach(list => {
-                    const index = mediaLists[list].findIndex(i => i._id === mediaId);
-                    if (index !== -1) mediaLists[list][index] = freshItem;
-                });
+                allMedia[mediaId] = freshItem;
 
                 const newProgress = getProgress(freshItem);
                 const total = freshItem.total_units || '?';
@@ -1136,10 +1137,7 @@
                     const freshItem = await response.json();
                     formatItem(freshItem);
 
-                    Object.keys(mediaLists).forEach(list => {
-                        const index = mediaLists[list].findIndex(i => i._id === currentOpenMediaId);
-                        if (index !== -1) mediaLists[list][index] = freshItem;
-                    });
+                    allMedia[currentOpenMediaId] = freshItem;
                     renderMedia();
                 }
             }
