@@ -318,6 +318,7 @@ async def get_watch_date_stats(list_name: str = None, media_type: str = None, pr
     return await cursor.to_list(length=500)
 
 # Don't have a release date yet, not sure I'll have time to add it
+# DON'T USE THIS
 # @app.get("/stats/release-date")
 # async def get_release_date_stats(list_name: str = None, media_type: str = None):
 #     match_query = {"release_date": {"$ne": None}} # Only items with a release date
@@ -336,64 +337,37 @@ async def get_watch_date_stats(list_name: str = None, media_type: str = None, pr
 #     return await cursor.to_list(length=500)
 
 
-
 @app.get("/stats/status-dist")
-async def get_status_dist_stats(list_name: str = None):
+async def get_status_dist_stats(list_name: str = None, media_type: str = None):
     match_query = {}
-    
-    # Only add filters if the user actually selected something other than "All"
-    if list_name and list_name != "All":
-        match_query["lists"] = list_name
-
+    if list_name and list_name != "All": match_query["lists"] = list_name
+    if media_type and media_type != "All": match_query["media_type"] = media_type
 
     pipeline = []
-    
-    # If dict isn't empty, make $match the first stage of the pipeline
-    if match_query:
-        pipeline.append({"$match": match_query})
+    if match_query: pipeline.append({"$match": match_query})
 
     pipeline.extend([
-        {"$group": {
-            "_id": "$status",
-            "media_count": {"$sum": 1},
-        }},
-        
+        {"$group": {"_id": "$status", "media_count": {"$sum": 1}}},
         {"$sort": {"media_count": -1}}
     ])
-
     cursor = db.media.aggregate(pipeline)
-    results = await cursor.to_list(length=100)
-    
-    return results
+    return await cursor.to_list(length=100)
 
 @app.get("/stats/media-type-dist")
-async def get_media_type_dist_stats(list_name: str = None):
+async def get_media_type_dist_stats(list_name: str = None, media_type: str = None):
     match_query = {}
-    
-    # Only add filters if the user actually selected something other than "All"
-    if list_name and list_name != "All":
-        match_query["lists"] = list_name
-
+    if list_name and list_name != "All": match_query["lists"] = list_name
+    if media_type and media_type != "All": match_query["media_type"] = media_type
 
     pipeline = []
-    
-    # If dict isn't empty, make $match the first stage of the pipeline
-    if match_query:
-        pipeline.append({"$match": match_query})
+    if match_query: pipeline.append({"$match": match_query})
 
     pipeline.extend([
-        {"$group": {
-            "_id": "$media_type",
-            "media_count": {"$sum": 1},
-        }},
-        
+        {"$group": {"_id": "$media_type", "media_count": {"$sum": 1}}},
         {"$sort": {"media_count": -1}}
     ])
-
     cursor = db.media.aggregate(pipeline)
-    results = await cursor.to_list(length=100)
-    
-    return results
+    return await cursor.to_list(length=100)
 
 
 @app.get("/stats/list-dist")
@@ -421,36 +395,50 @@ async def get_list_dist_stats(media_type: str = None):
     return await cursor.to_list(length=100)
 
 @app.get("/stats/completion-speed")
-async def get_completion_speed():
-    pipeline = [
-        {"$unwind": "$watch_history"},
+async def get_completion_speed(list_name: str = None, media_type: str = None, bins: int = None):
+    match_query = {}
+    if list_name and list_name != "All": match_query["lists"] = list_name
+    if media_type and media_type != "All": match_query["media_type"] = media_type
 
+    pipeline = []
+    if match_query: pipeline.append({"$match": match_query})
+
+    pipeline.extend([
+        {"$unwind": "$watch_history"},
         {"$match": {
             "watch_history.status": "COMPLETED",
-            "watch_history.start_date": {"$ne": None},
-            "watch_history.end_date": {"$ne": None}
+            "watch_history.start_date": {"$exists": True, "$ne": None},
+            "watch_history.end_date": {"$exists": True, "$ne": None}
         }},
-
+        # BULLETPROOF DATE PARSING: Silently ignores bad string formats instead of crashing
         {"$project": {
-            "title": 1,
+            "start": {"$convert": {"input": "$watch_history.start_date", "to": "date", "onError": None, "onNull": None}},
+            "end": {"$convert": {"input": "$watch_history.end_date", "to": "date", "onError": None, "onNull": None}}
+        }},
+        # Filter out anything that failed to convert
+        {"$match": {"start": {"$ne": None}, "end": {"$ne": None}}},
+        {"$project": {
             "days_taken": {
                 "$divide": [
-                    {"$subtract": ["$watch_history.end_date", "$watch_history.start_date"]},
+                    {"$subtract": ["$end", "$start"]},
                     1000 * 60 * 60 * 24
                 ]
             }
         }},
-
-        {"$group": {
-            "_id": "Average Completion Time",
-            "avg_days": {"$avg": "$days_taken"},
-            "min_days": {"$min": "$days_taken"},
-            "max_days": {"$max": "$days_taken"}
+        {"$match": {"days_taken": {"$gte": 0}}},
+        {"$bucketAuto": {
+            "groupBy": "$days_taken",
+            "buckets": bins if bins else 10,
+            "output": {"media_count": {"$sum": 1}}
         }}
-    ]
+    ])
 
-    cursor = db.media.aggregate(pipeline)
-    return await cursor.to_list(length=1)
+    try:
+        cursor = db.media.aggregate(pipeline)
+        return await cursor.to_list(length=100)
+    except Exception as e:
+        print(f"Aggregation Error: {e}")
+        return []
 
 
 

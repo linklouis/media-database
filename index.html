@@ -645,6 +645,14 @@
                         <h3 class="stat-title">Watch History (Completions)</h3> 
                         <div style="height: 300px;"><canvas id="watchHistoryChart"></canvas></div>
                     </div>
+
+                    <div class="stat-card">
+                        <h3 class="stat-title">Completion Speed Distribution</h3> 
+                        <label>Bins: 
+                            <input type="number" id="speed-histo-bins" value="10" min="2" max="20" style="width: 60px;" onchange="fetchStats()">
+                        </label>
+                        <div style="flex:1;"><canvas id="speedHistoChart"></canvas></div>
+                    </div>
                 </div>
             </div>
 
@@ -738,7 +746,7 @@
             ...chartOptions,
             plugins: { legend: { display: true, position: 'right' } },
             cutout: '60%'
-        };
+        }; // TODO: Get rid of x and y axis
 
         const statusColors = {
             'COMPLETED': '#28a745',
@@ -1332,12 +1340,27 @@
 
             try {
                 const bins = Math.round(document.getElementById('histo-bins').value || 10);
-                const [histoData, statusDist, typeDist, listDist, historyData] = await Promise.all([
-                    fetch(`${API_URL}/stats/score-histo${query}&bins=${bins}`).then(res => res.json()),
-                    fetch(`${API_URL}/stats/status-dist?list_name=${list}`).then(res => res.json()),
-                    fetch(`${API_URL}/stats/media-type-dist?list_name=${list}`).then(res => res.json()),
-                    fetch(`${API_URL}/stats/list-dist?media_type=${type}`).then(res => res.json()),
-                    fetch(`${API_URL}/stats/watch-date${query}`).then(res => res.json())
+                const speedBins = Math.round(document.getElementById('speed-histo-bins').value || 10);
+
+                // Fail-safe fetch
+                const safeFetch = async (url) => {
+                    try {
+                        const res = await fetch(url);
+                        if (!res.ok) return []; 
+                        const data = await res.json();
+                        return Array.isArray(data) ? data : []; 
+                    } catch (e) {
+                        return []; 
+                    }
+                };
+
+                const [histoData, statusDist, typeDist, listDist, historyData, completionSpeed] = await Promise.all([
+                    safeFetch(`${API_URL}/stats/score-histo${query}&bins=${bins}`),
+                    safeFetch(`${API_URL}/stats/status-dist?list_name=${list}`),
+                    safeFetch(`${API_URL}/stats/media-type-dist?list_name=${list}`),
+                    safeFetch(`${API_URL}/stats/list-dist?media_type=${type}`),
+                    safeFetch(`${API_URL}/stats/watch-date${query}`),
+                    safeFetch(`${API_URL}/stats/completion-speed${query}&bins=${speedBins}`)
                 ]);
 
                 // Cleanup old charts
@@ -1348,8 +1371,22 @@
                     plugins: { legend: { display: true, position: 'bottom' } }
                 };
 
-                // Score Histogram
-                charts.score = new Chart(document.getElementById('scoreHistoChart'), {
+                // Helper to draw charts OR display "No Data" text
+                const renderChart = (chartKey, canvasId, data, chartConfig) => {
+                    const canvas = document.getElementById(canvasId);
+                    const ctx = canvas.getContext('2d');
+                    if (data.length === 0) {
+                        ctx.clearRect(0, 0, canvas.width, canvas.height);
+                        ctx.font = "16px sans-serif";
+                        ctx.fillStyle = "#999";
+                        ctx.textAlign = "center";
+                        ctx.fillText("No data for this filter", canvas.width / 2, canvas.height / 2);
+                    } else {
+                        charts[chartKey] = new Chart(canvas, chartConfig);
+                    }
+                };
+
+                renderChart('score', 'scoreHistoChart', histoData, {
                     type: 'bar',
                     data: {
                         labels: histoData.map(d => `${(d._id.min/100).toFixed(1)}-${(d._id.max/100).toFixed(1)}`),
@@ -1358,8 +1395,7 @@
                     options: chartOptions
                 });
 
-                // Status Distribution
-                charts.status_dist = new Chart(document.getElementById('statusDistChart'), {
+                renderChart('status_dist', 'statusDistChart', statusDist, {
                     type: 'doughnut',
                     data: {
                         labels: statusDist.map(d => d._id),
@@ -1371,8 +1407,7 @@
                     options: commonPieOptions
                 });
 
-                // Media Type Dist
-                charts.typeDist = new Chart(document.getElementById('mediaTypeDistChart'), {
+                renderChart('typeDist', 'mediaTypeDistChart', typeDist, {
                     type: 'doughnut',
                     data: {
                         labels: typeDist.map(d => d._id),
@@ -1384,8 +1419,7 @@
                     options: commonPieOptions
                 });
 
-                // List Dist
-                charts.listDist = new Chart(document.getElementById('listDistChart'), { // TODO: Not showing up
+                renderChart('listDist', 'listDistChart', listDist, {
                     type: 'doughnut',
                     data: {
                         labels: listDist.map(d => d._id),
@@ -1397,8 +1431,7 @@
                     options: commonPieOptions
                 });
 
-                // Watch History
-                charts.history = new Chart(document.getElementById('watchHistoryChart'), {
+                renderChart('history', 'watchHistoryChart', historyData, {
                     type: 'line',
                     data: {
                         labels: historyData.map(d => d._id),
@@ -1409,6 +1442,24 @@
                             backgroundColor: 'rgba(0, 123, 255, 0.1)',
                             fill: true,
                             tension: 0.3
+                        }]
+                    },
+                    options: chartOptions
+                });
+
+                renderChart('speed', 'speedHistoChart', completionSpeed, {
+                    type: 'bar',
+                    data: {
+                        labels: completionSpeed.map(d => {
+                            if (d._id && typeof d._id.min === 'number') {
+                                return `${Math.round(d._id.min)} - ${Math.round(d._id.max)} days`;
+                            }
+                            return "Unknown";
+                        }),
+                        datasets: [{ 
+                            label: 'Shows Completed', 
+                            data: completionSpeed.map(d => d.media_count), 
+                            backgroundColor: '#20c997' 
                         }]
                     },
                     options: chartOptions
