@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Personal Media Database</title>
@@ -464,7 +465,6 @@
         }
 
 
-
         .multi-select-item {
             display: block;
             position: relative;
@@ -526,36 +526,75 @@
             cursor: pointer;
             text-align: center;
         }
+
+
+        .stat-card { 
+            background: var(--card-bg); 
+            padding: 20px; 
+            border-radius: 12px; 
+            box-shadow: 0 4px 12px var(--shadow);
+            display: flex;
+            flex-direction: column;
+            transition: transform 0.2s ease;
+            gap: 6px;
+            justify-content: space-between;
+            width: 100%;
+            max-height: 400px;
+        }
+        .stat-card-details {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            flex: 1;
+        }
+        .stat-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 6px 20px var(--shadow);
+        }
+
+        .stat-title {
+            text-align: center;
+            margin-top: 0;
+        }
     </style>
 </head>
 <body>
 
     <div style="max-width: 1440px; width: 100%;">
         <!-- <h1>My Media Library</h1> --> <!-- I did kinda like having this be separate from the bar, but having it be on the bar makes sense for now until the bar maybe fills up more. Or maybe have it be above the bar when we're scrolled to the top of the page, but fall down into the bar when you scroll down?-->
-        <div class="sticky-header">
-            <h1>Media Library</h1>
-            <h3>0 Entries</h3>
-            <search>
-                <form>
-                    <input class="search-bar" name="fsrch" id="fsrch" placeholder="🔍︎" style="border-radius: 15px; cursor: text;"> <!-- TODO: looks bad when selected -->
-                </form>
-            </search>
-            <label style="padding-left: 10px;">Sort
-                <select id="sort-order" onchange="renderMedia()">
-                    <option value="name">Name</option>
-                    <option value="score">Score</option>
-                    <option value="watch_date">Recently Watched</option>
-                    <option value="repeats">Repeats</option>
-                    <option value="repeats">Release Date</option> <!-- TODO -->
-                </select>
-            </label>
-            <button class="btn" onclick="addNew('PLANNING')">New</button>
+        <div class="sticky-header" style="flex-direction: column; align-items: stretch; padding: 10px 20px;">
+    
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--header-border); padding-bottom: 10px; margin-bottom: 10px;">
+                <h1 style="margin: 0; font-size: 1.8em; text-shadow: 2px 2px 4px var(--shadow);">Media Library</h1>
+                
+                <!-- TODO: Make these look more like tabs -->
+                <div style="display: flex; gap: 15px;">
+                    <button class="btn" style="background: #333;" onclick="switchPage('library')">Library</button>
+                    <button class="btn" style="background: transparent; color: var(--text-color); border: 1px solid var(--header-border);" onclick="switchPage('stats')">Stats</button>
+                </div>
 
-            <button class="theme-toggle" onclick="toggleDarkMode()" id="theme-btn">⏾ Mode</button>
+                <button class="theme-toggle" onclick="toggleDarkMode()" id="theme-btn">⏾ Mode</button>
+            </div>
+
+            <div id="library-toolbar" style="display: flex; align-items: center; gap: 15px;">
+                <h3 style="margin: 0;">0 Entries</h3>
+                <search style="margin: 0;">
+                    <form style="margin: 0;">
+                        <input class="search-bar" name="fsrch" id="fsrch" placeholder="🔍︎" style="border-radius: 15px;">
+                    </form>
+                </search>
+                <label>Sort:
+                    <select id="sort-order" onchange="renderMedia()">
+                        <option value="name">Name</option>
+                        <option value="score">Score</option>
+                        <option value="watch_date">Recently Watched</option>
+                    </select>
+                </label>
+                <button class="btn" onclick="addNew('PLANNING')" style="margin: 0;">New</button>
+            </div>
         </div>
 
         <div>
-
             <div style="display: flex; flex-direction: row; gap: 25px;">
                 <div class="controls-container">
                     <div>
@@ -570,11 +609,46 @@
                     </div>
                 </div>
 
-                <div class="media-container" id="media-container" class="block" style="width: 100%;">
-                    <h2>Loading media...</h2>
+                <div id="library-view">
+                    <div class="media-container" id="media-container" class="block" style="width: 100%;">
+                        <h2>Loading media...</h2>
+                    </div>
+                </div>
+
+                <div id="stats-view" style="display: none; padding: 20px; width: 100%">
+                    <h2 style="grid-column: span 2;">Your Stats</h2>
+                    
+                    <div class="stat-card">
+                        <h3 class="stat-title">Score Distribution</h3> 
+                        <label>Bins: 
+                            <input type="number" id="histo-bins" value="10" min="2" max="20" style="width: 60px;" onchange="fetchStats()">
+                        </label>
+                        <div style="flex:1;"><canvas id="scoreHistoChart"></canvas></div>
+                    </div>
+
+                    <div class="stat-card">
+                        <h3 class="stat-title">Status Distribution</h3> 
+                        <div style="flex:1;"><canvas id="statusDistChart"></canvas></div>
+                    </div>
+
+                    <div class="stat-card">
+                        <h3 class="stat-title">Media Type Distribution</h3> 
+                        <div style="flex:1;"><canvas id="mediaTypeDistChart"></canvas></div>
+                    </div>
+
+                    <div class="stat-card">
+                        <h3 class="stat-title">List Distribution</h3> 
+                        <div style="flex:1;"><canvas id="listDistChart"></canvas></div>
+                    </div>
+
+                    <div class="stat-card" style="grid-column: span 2;">
+                        <h3 class="stat-title">Watch History (Completions)</h3> 
+                        <div style="height: 300px;"><canvas id="watchHistoryChart"></canvas></div>
+                    </div>
                 </div>
             </div>
 
+            
             <div id="details-modal" class="modal">
                 <div class="modal-content">
                     <div>
@@ -650,6 +724,30 @@
         const mediaFormats = ['Anime', 'Anime Movie', 'AMV', 'Manga', 'Light Novel', 'Live-Action Movie', 'Show', 'Webtoon', 'Book'];
         let currentOpenMediaId = null;
         let editingItem = null;
+        let charts = {}; // To store chart instances for cleanup
+
+        const chartOptions = {
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+                y: { beginAtZero: true, ticks: { precision: 0 } }
+            }
+        };
+
+        const pieOptions = {
+            ...chartOptions,
+            plugins: { legend: { display: true, position: 'right' } },
+            cutout: '60%'
+        };
+
+        const statusColors = {
+            'COMPLETED': '#28a745',
+            'CURRENT': '#007bff',
+            'PLANNING': '#6c757d',
+            'DROPPED': '#dc3545',
+            'PAUSED': '#ffc107',
+            'REPEATING': '#17a2b8'
+        };
 
         const startBtn = document.getElementById('start-btn');
         const finishBtn = document.getElementById('finish-btn');
@@ -689,6 +787,10 @@
         function selectList(name) {
             selectedList = name;
             renderMedia();
+            // If stats are visible, refresh them too
+            if (document.getElementById('stats-view').style.display !== 'none') {
+                fetchStats();
+            }
         }
 
         function getMediaFormat(mediaType) {
@@ -775,17 +877,12 @@
             // TODO: Update UI
         }
 
-
-        /*
-         * PRIMARY FUNCTION DEFINITIONS:
-         */
-
-        async function fetchMedia() {
+        async function fetchLists() {
             try {
-                const response = await fetch(`${API_URL}/media/`);
+                const response = await fetch(`${API_URL}/lists/`);
                 if (!response.ok) throw new Error("Network response was not ok");
                 
-                const rawMedia = await response.json();
+                const rawLists = await response.json();
                 mediaLists = {
                     CURRENT:[],
                     REPEATING:[],
@@ -794,6 +891,51 @@
                     PAUSED:[],
                     DROPPED:[]
                 };
+
+                rawLists.forEach(list => {
+                    if (!(list.name in mediaLists)) {
+                        mediaLists[list.name] = [];
+                    }
+                });
+
+                return Object.keys(mediaLists);
+            } catch (error) {
+                console.error("Error fetching list data:", error);
+                document.getElementById('media-container').innerHTML = "<p>Error loading lists</p>";
+            }
+        }
+
+
+        /*
+         * PRIMARY FUNCTION DEFINITIONS:
+         */
+
+        function switchPage(page) {
+            const libraryView = document.getElementById('library-view');
+            const statsView = document.getElementById('stats-view');
+            const libraryToolbar = document.getElementById('library-toolbar');
+
+            if (page === 'stats') {
+                libraryView.style.display = 'none';
+                libraryToolbar.style.display = 'none';
+                statsView.style.display = 'flex';
+                statsView.style.flexDirection = 'column';
+                statsView.style.gap = '10px';
+                fetchStats();
+            } else {
+                libraryView.style.display = 'flex';
+                libraryToolbar.style.display = 'flex';
+                statsView.style.display = 'none';
+            }
+        }
+
+        async function fetchMedia() {
+            try {
+                const response = await fetch(`${API_URL}/media/`);
+                if (!response.ok) throw new Error("Network response was not ok");
+                
+                const rawMedia = await response.json();
+                const lists = await fetchLists();
 
                 rawMedia.forEach(item => {
                     allMedia[item._id] = item;
@@ -806,7 +948,7 @@
 
                     for (const list of item.lists) {
                         if (!(list in mediaLists)) {
-                            mediaLists[list] = [];
+                            alert(`${item.name} has list ${list} which wasn't found in the database.`)
                         }
                         mediaLists[list].push(item._id);
                     }
@@ -1125,7 +1267,7 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         media_id: currentOpenMediaId,
-                        new_score: editingItem.score,
+                        new_score: parseInt(editingItem.score),
                         new_status: editingItem.status,
                         watch_history: editingItem.watch_history
                     })
@@ -1147,15 +1289,136 @@
             currentOpenMediaId = null;
         }
 
-        async function addNew() {
-            // TODO
+        async function addNew(defaultStatus = 'PLANNING') {
+            const title = prompt("Enter Media Title:");
+            if (!title) return;
+
+            try {
+                const response = await fetch(`${API_URL}/media/?title=${encodeURIComponent(title)}&status=${defaultStatus}`, {
+                    method: 'POST'
+                });
+                if (response.ok) {
+                    const newItem = await response.json();
+                    // Add to local cache and refresh UI
+                    allMedia[newItem._id] = newItem;
+                    formatItem(allMedia[newItem._id]);
+                    fetchMedia(); // Re-fetch to handle list groupings
+                }
+            } catch (error) {
+                console.error("Error creating media:", error);
+            }
         }
 
-        function newList() {
-            // TODO: turn button into a text box and accept name
+        async function newList() {
+            const name = prompt("Enter New List Name:");
+            if (!name) return;
+            const color = prompt("Enter a CSS color (e.g., #ff0000 or 'blue'):", "#777777");
+
+            try {
+                // You'll need a POST route for /lists/ if you want to save this to DB
+                // For now, let's just alert that it's a future feature or 
+                // implement a quick fetch if you add the route to main.py
+                alert("List created! Note: You need a POST /lists/ backend route to make this permanent.");
+            } catch (error) {
+                console.error("Error creating list:", error);
+            }
         }
 
-        // Run the fetch when the page loads
+
+        async function fetchStats() {
+            const list = selectedList === 'All' ? '' : selectedList;
+            const type = selectedMediaType === 'All' ? '' : selectedMediaType;
+            const query = `?list_name=${encodeURIComponent(list)}&media_type=${encodeURIComponent(type)}`;
+
+            try {
+                const bins = Math.round(document.getElementById('histo-bins').value || 10);
+                const [histoData, statusDist, typeDist, listDist, historyData] = await Promise.all([
+                    fetch(`${API_URL}/stats/score-histo${query}&bins=${bins}`).then(res => res.json()),
+                    fetch(`${API_URL}/stats/status-dist?list_name=${list}`).then(res => res.json()),
+                    fetch(`${API_URL}/stats/media-type-dist?list_name=${list}`).then(res => res.json()),
+                    fetch(`${API_URL}/stats/list-dist?media_type=${type}`).then(res => res.json()),
+                    fetch(`${API_URL}/stats/watch-date${query}`).then(res => res.json())
+                ]);
+
+                // Cleanup old charts
+                Object.values(charts).forEach(chart => chart.destroy());
+
+                const commonPieOptions = {
+                    ...chartOptions,
+                    plugins: { legend: { display: true, position: 'bottom' } }
+                };
+
+                // Score Histogram
+                charts.score = new Chart(document.getElementById('scoreHistoChart'), {
+                    type: 'bar',
+                    data: {
+                        labels: histoData.map(d => `${(d._id.min/100).toFixed(1)}-${(d._id.max/100).toFixed(1)}`),
+                        datasets: [{ label: 'Shows', data: histoData.map(d => d.media_count), backgroundColor: '#007bff' }]
+                    },
+                    options: chartOptions
+                });
+
+                // Status Distribution
+                charts.status_dist = new Chart(document.getElementById('statusDistChart'), {
+                    type: 'doughnut',
+                    data: {
+                        labels: statusDist.map(d => d._id),
+                        datasets: [{
+                            data: statusDist.map(d => d.media_count),
+                            backgroundColor: statusDist.map(d => statusColors[d._id] || '#999')
+                        }]
+                    },
+                    options: commonPieOptions
+                });
+
+                // Media Type Dist
+                charts.typeDist = new Chart(document.getElementById('mediaTypeDistChart'), {
+                    type: 'doughnut',
+                    data: {
+                        labels: typeDist.map(d => d._id),
+                        datasets: [{
+                            data: typeDist.map(d => d.media_count),
+                            backgroundColor: ['#fd7e14', '#20c997', '#6f42c1', '#e83e8c', '#007bff']
+                        }]
+                    },
+                    options: commonPieOptions
+                });
+
+                // List Dist
+                charts.listDist = new Chart(document.getElementById('listDistChart'), { // TODO: Not showing up
+                    type: 'doughnut',
+                    data: {
+                        labels: listDist.map(d => d._id),
+                        datasets: [{
+                            data: listDist.map(d => d.media_count),
+                            backgroundColor: ['#17a2b8', '#ffc107', '#28a745', '#6c757d', '#dc3545', '#6f42c1']
+                        }]
+                    },
+                    options: commonPieOptions
+                });
+
+                // Watch History
+                charts.history = new Chart(document.getElementById('watchHistoryChart'), {
+                    type: 'line',
+                    data: {
+                        labels: historyData.map(d => d._id),
+                        datasets: [{
+                            label: 'Completions',
+                            data: historyData.map(d => d.count),
+                            borderColor: '#007bff',
+                            backgroundColor: 'rgba(0, 123, 255, 0.1)',
+                            fill: true,
+                            tension: 0.3
+                        }]
+                    },
+                    options: chartOptions
+                });
+
+            } catch (error) {
+                console.error("Stats Rendering Error:", error);
+            }
+        }
+
         window.onload = fetchMedia;
     </script>
 

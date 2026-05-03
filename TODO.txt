@@ -15,3 +15,4 @@
 - Lists in details should only be selected if the media is in that list
 - Clean up variable names? (watchHistory stuff should just be history, css names to better follow standards, etc.)
 - Add stats page (Probably need to change the way the header bar works)
+- Allow the user to select options for all the charts

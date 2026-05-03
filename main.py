@@ -43,7 +43,7 @@ app.add_middleware(
 
 @app.post("/activity/", response_model=MediaItem)
 async def log_activity(event: ActivityEvent):
-    # TODO: If there are no IN-PROGRESS watch_history elements, we should make a new one, and update the media's status.
+    # TODO: If there are no IN-PROGRESS watch_history elements, make a new one, and update the media's status.
     # TODO: Also, if we just reached the end of the media, update the status and change the repeats count if necessary.
     event_dict = event.model_dump()
     event_dict["timestamp"] = datetime.datetime.now(datetime.UTC)
@@ -153,10 +153,59 @@ async def update_media_details(media_id: str, update_data: DetailsUpdate):
     raise HTTPException(status_code=404, detail="Media not found after update")
 
 
+@app.get("/lists/")
+async def get_all_lists():
+    cursor = db.lists.find({})
+    results = []
+    async for document in cursor:
+        document["_id"] = str(document["_id"])
+        results.append(document)
+    return results
+
+
+
+
+@app.post("/media/", response_model=MediaItem)
+async def create_media(title: str, status: str = "PLANNING"):
+    new_doc = {
+        "title": title,
+        "status": status,
+        "media_type": "Anime", # Default
+        "score": 0,
+        "total_units": 0,
+        "lists": [],
+        "watch_history": []
+    }
+    result = await db.media.insert_one(new_doc)
+    new_doc["_id"] = str(result.inserted_id)
+    return new_doc
+
+
+
+
+
+
+
 @app.get("/stats/lists")
-async def get_list_stats():
-    pipeline = [
-        {"$unwind": "$lists"},
+async def get_list_stats(list_name: str = None, media_type: str = None):
+    match_query = {}
+    
+    # Only add filters if the user actually selected something other than "All"
+    if list_name and list_name != "All":
+        match_query["lists"] = list_name
+        
+    if media_type and media_type != "All":
+        match_query["media_type"] = media_type
+
+
+    pipeline = []
+    
+    # If dict isn't empty, make $match the first stage of the pipeline
+    if match_query:
+        pipeline.append({"$match": match_query})
+
+    pipeline.extend([
+        {"$unwind": {"path": "$lists", "preserveNullAndEmptyArrays": True}},
         
         {"$lookup": {
             "from": "lists",
@@ -165,10 +214,10 @@ async def get_list_stats():
             "as": "list_details"
         }},
         
-        {"$unwind": "$list_details"},
+        {"$unwind": {"path": "$list_details", "preserveNullAndEmptyArrays": True}}, 
         
         {"$group": {
-            "_id": "$lists", # Group by the list name
+            "_id": "$lists", 
             "media_count": {"$sum": 1},
             "average_score": {"$avg": "$score"},
             "color": {"$first": "$list_details.color"},
@@ -176,13 +225,235 @@ async def get_list_stats():
         }},
         
         {"$sort": {"media_count": -1}}
-    ]
+    ])
 
-    # Run the aggregation
     cursor = db.media.aggregate(pipeline)
     results = await cursor.to_list(length=100)
     
     return results
+
+
+@app.get("/stats/media-types")
+async def get_media_type_stats(list_name: str = None, media_type: str = None):
+    match_query = {}
+    if list_name and list_name != "All": match_query["lists"] = list_name
+    if media_type and media_type != "All": match_query["media_type"] = media_type
+
+    pipeline = []
+    if match_query: pipeline.append({"$match": match_query})
+
+    pipeline.extend([
+        {"$group": {
+            "_id": "$media_type",
+            "media_count": {"$sum": 1},
+            "average_score": {"$avg": "$score"},
+            "max_score": {"$max": "$score"}
+        }},
+        {"$sort": {"average_score": -1}}
+    ])
+    cursor = db.media.aggregate(pipeline)
+    return await cursor.to_list(length=100)
+
+
+@app.get("/stats/score-histo")
+async def get_score_histo_stats(list_name: str = None, media_type: str = None, bins: int = None):
+    match_query = {}
+    
+    # Only add filters if the user actually selected something other than "All"
+    if list_name and list_name != "All":
+        match_query["lists"] = list_name
+        
+    if media_type and media_type != "All":
+        match_query["media_type"] = media_type
+
+
+    pipeline = []
+    
+    # If dict isn't empty, make $match the first stage of the pipeline
+    if match_query:
+        pipeline.append({"$match": match_query})
+
+    pipeline.extend([
+        {"$match": {"score": {"$gt": 0}}},
+        
+        {"$bucketAuto": {
+            "groupBy": "$score",
+            "buckets": bins if bins else 10,
+            "output": {
+                "media_count": {"$sum": 1}
+            }
+        }}
+    ])
+
+    cursor = db.media.aggregate(pipeline)
+    results = await cursor.to_list(length=100)
+    
+    return results
+
+@app.get("/stats/watch-date")
+async def get_watch_date_stats(list_name: str = None, media_type: str = None, precision: str = 'month'):
+    # TODO: Actually have this use both the start and end date, but also the activity log
+    match_query = {}
+    if list_name and list_name != "All": match_query["lists"] = list_name
+    if media_type and media_type != "All": match_query["media_type"] = media_type
+
+    # Determine date format based on precision
+    date_format = "%Y-%m" if precision == 'month' else "%Y"
+
+    pipeline = []
+    if match_query: pipeline.append({"$match": match_query})
+    
+    pipeline.extend([
+        {"$unwind": "$watch_history"},
+        # Only count completed attempts that have an end_date
+        {"$match": {"watch_history.status": "COMPLETED", "watch_history.end_date": {"$ne": None}}},
+        {"$group": {
+            "_id": {"$dateToString": {"format": date_format, "date": "$watch_history.end_date"}},
+            "count": {"$sum": 1}
+        }},
+        {"$sort": {"_id": 1}} # Sort chronologically
+    ])
+
+    cursor = db.media.aggregate(pipeline)
+    return await cursor.to_list(length=500)
+
+# Don't have a release date yet, not sure I'll have time to add it
+# @app.get("/stats/release-date")
+# async def get_release_date_stats(list_name: str = None, media_type: str = None):
+#     match_query = {"release_date": {"$ne": None}} # Only items with a release date
+#     if list_name and list_name != "All": match_query["lists"] = list_name
+#     if media_type and media_type != "All": match_query["media_type"] = media_type
+
+#     pipeline = [
+#         {"$match": match_query},
+#         {"$group": {
+#             "_id": {"$year": "$release_date"},
+#             "count": {"$sum": 1}
+#         }},
+#         {"$sort": {"_id": 1}}
+#     ]
+#     cursor = db.media.aggregate(pipeline)
+#     return await cursor.to_list(length=500)
+
+
+
+@app.get("/stats/status-dist")
+async def get_status_dist_stats(list_name: str = None):
+    match_query = {}
+    
+    # Only add filters if the user actually selected something other than "All"
+    if list_name and list_name != "All":
+        match_query["lists"] = list_name
+
+
+    pipeline = []
+    
+    # If dict isn't empty, make $match the first stage of the pipeline
+    if match_query:
+        pipeline.append({"$match": match_query})
+
+    pipeline.extend([
+        {"$group": {
+            "_id": "$status",
+            "media_count": {"$sum": 1},
+        }},
+        
+        {"$sort": {"media_count": -1}}
+    ])
+
+    cursor = db.media.aggregate(pipeline)
+    results = await cursor.to_list(length=100)
+    
+    return results
+
+@app.get("/stats/media-type-dist")
+async def get_media_type_dist_stats(list_name: str = None):
+    match_query = {}
+    
+    # Only add filters if the user actually selected something other than "All"
+    if list_name and list_name != "All":
+        match_query["lists"] = list_name
+
+
+    pipeline = []
+    
+    # If dict isn't empty, make $match the first stage of the pipeline
+    if match_query:
+        pipeline.append({"$match": match_query})
+
+    pipeline.extend([
+        {"$group": {
+            "_id": "$media_type",
+            "media_count": {"$sum": 1},
+        }},
+        
+        {"$sort": {"media_count": -1}}
+    ])
+
+    cursor = db.media.aggregate(pipeline)
+    results = await cursor.to_list(length=100)
+    
+    return results
+
+
+@app.get("/stats/list-dist")
+async def get_list_dist_stats(media_type: str = None):
+    match_query = {}
+    if media_type and media_type != "All":
+        match_query["media_type"] = media_type
+
+    pipeline = []
+    if match_query:
+        pipeline.append({"$match": match_query})
+
+    pipeline.extend([
+        {"$unwind": "$lists"},
+        
+        {"$group": {
+            "_id": "$lists",
+            "media_count": {"$sum": 1}
+        }},
+        
+        {"$sort": {"media_count": -1}}
+    ])
+
+    cursor = db.media.aggregate(pipeline)
+    return await cursor.to_list(length=100)
+
+@app.get("/stats/completion-speed")
+async def get_completion_speed():
+    pipeline = [
+        {"$unwind": "$watch_history"},
+
+        {"$match": {
+            "watch_history.status": "COMPLETED",
+            "watch_history.start_date": {"$ne": None},
+            "watch_history.end_date": {"$ne": None}
+        }},
+
+        {"$project": {
+            "title": 1,
+            "days_taken": {
+                "$divide": [
+                    {"$subtract": ["$watch_history.end_date", "$watch_history.start_date"]},
+                    1000 * 60 * 60 * 24
+                ]
+            }
+        }},
+
+        {"$group": {
+            "_id": "Average Completion Time",
+            "avg_days": {"$avg": "$days_taken"},
+            "min_days": {"$min": "$days_taken"},
+            "max_days": {"$max": "$days_taken"}
+        }}
+    ]
+
+    cursor = db.media.aggregate(pipeline)
+    return await cursor.to_list(length=1)
+
+
+
 
 
 if __name__ == "__main__":
